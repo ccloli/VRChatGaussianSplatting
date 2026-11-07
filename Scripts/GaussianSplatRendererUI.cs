@@ -22,6 +22,7 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
     const int LanguageChineseSimplified = 2;
     const float MinAlphaCutoff = 0.005f;
     const float MinPositiveLodSplatCap = 10000.0f;
+    const float NoCapSliderGap = 0.01f;
     const int SliderShBand = 0;
     const int SliderAntiAliasing = 1;
     const int SliderLightVolumeIntensity = 2;
@@ -891,7 +892,7 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
         {
             return 0.0f;
         }
-        return ToLogSliderValue(Mathf.Max(value, minPositiveValue), minPositiveValue, maxValue);
+        return Mathf.Lerp(NoCapSliderGap, 1.0f, ToLogSliderValue(Mathf.Max(value, minPositiveValue), minPositiveValue, maxValue));
     }
 
     float FromZeroLogSliderValue(float sliderValue, float minPositiveValue, float maxValue)
@@ -900,7 +901,7 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
         {
             return 0.0f;
         }
-        return FromLogSliderValue(sliderValue, minPositiveValue, maxValue);
+        return FromLogSliderValue(Mathf.InverseLerp(NoCapSliderGap, 1.0f, sliderValue), minPositiveValue, maxValue);
     }
 
     float GetLodSplatCapSliderMax()

@@ -103,7 +103,7 @@ The renderer creates a world-space control canvas automatically when splats are 
 ### Controls
 
 - Gallery selection (synced)
-- Quality presets: Very Low / Low / Medium / High (set alpha cull + alpha cutoff)
+- Quality presets: Very Low / Low / Medium / High (set alpha cull, alpha cutoff, and the LOD budget)
 - SH Band
 - VRC Light Volumes (toggle) + Light Volume Intensity
 - Gaussian Scale
@@ -114,6 +114,10 @@ The renderer creates a world-space control canvas automatically when splats are 
 - Panel additional descriptions can be entered separately for each language in the UI component inspector. Existing generated panels are upgraded in place. Both TMP fonts use dynamic, multi-atlas population; panel text and gallery names/descriptions are also added to the font assets in the editor. Characters first encountered in a running world are added to its in-memory atlas when the source font contains them. The Chinese font tag uses the default TextMesh Pro font resource path (`Fonts & Materials/`); if that path is customized, place the SC TMP font asset under the configured Resources path.
 - An **Advanced Settings** toggle reveals the finer sliders
 - LOD Splat Cap (shown only when LOD splats are present)
+
+On the `GaussianSplatRenderer` inspector, the PC and Android **Preset Caps** set the four LOD budgets to 1/4, 1/2, 3/4 and 1 of the respective cap (with the existing floor of the smaller of 64K and the preset cap). The startup capacity also uses the preset cap. A preset cap of 0 keeps the legacy unbudgeted mode: all four tiers have no LOD budget, though their alpha settings still differ.
+
+The separate PC and Android **Global Caps** set the maximum of the in-world advanced LOD Splat Cap slider without changing those presets or startup values. A global cap of 0 inherits the preset cap; a smaller nonzero value does not lower it. For example, keep the PC preset cap at 4,194,304 and set the PC global cap to 8,388,608 to let users choose a larger budget manually. If the preset cap is 0, the slider can still select no cap. Existing scenes inherit their previous limits automatically. The renderer supports at most 16,777,216 splats; exceeding the 4M resource bucket can select the 16M bucket and increase GPU memory use substantially.
 
 Render queue and the sort/material settings live on the `GaussianSplatRenderer` component inspector. Use `Update Sorting Resource Textures` there to resize the sorting textures to fit the largest assigned splat instead of editing those assets by hand.
 
@@ -326,7 +330,7 @@ VRChat ワールド（Udon）でスプラットをランタイムにカメラソ
 ### コントロール
 
 - ギャラリー選択（同期）
-- 品質プリセット：Very Low / Low / Medium / High（アルファカル＋アルファカットオフを設定）
+- 品質プリセット：Very Low / Low / Medium / High（アルファカル、アルファカットオフ、LOD 予算を設定）
 - SH バンド
 - VRC Light Volumes（トグル）＋ Light Volume Intensity
 - ガウススケール
@@ -337,6 +341,10 @@ VRChat ワールド（Udon）でスプラットをランタイムにカメラソ
 - UI コンポーネントのインスペクターで各言語の追加説明を入力可能。既存の自動生成パネルもそのまま更新される。両方の TMP フォントは動的・マルチアトラスで、パネルやギャラリーのテキストもエディタでフォントに追加される。実行中に初めて現れた文字は、元のフォントに存在すればメモリ上のアトラスに追加される。中国語フォントタグは TextMesh Pro 標準のリソースパス（`Fonts & Materials/`）を使用する。変更した場合は SC TMP フォントアセットを設定済みの Resources パスへ配置する。
 - **詳細設定** トグルで細かいスライダーを表示
 - LOD Splat Cap（LOD スプラットが存在するときのみ表示）
+
+`GaussianSplatRenderer` の PC／Android **Preset Cap** は、4 段階の LOD 予算を各上限の 1/4、1/2、3/4、1 に設定する（従来どおり 64K とプリセット上限の小さい方が下限）。起動時容量もこの上限を基準とする。Preset Cap が 0 の場合は従来どおり予算制限なしとなり、4 段階で LOD 予算は同じだがアルファ設定は異なる。
+
+PC／Android の **Global Cap** は、プリセットや起動時の値を変えずに、ワールド内の詳細設定にある LOD Splat Cap スライダーの最大値を設定する。0 は Preset Cap を継承し、それより小さい値でも上限は下がらない。例えば PC Preset Cap を 4,194,304 のまま PC Global Cap を 8,388,608 にすれば、ユーザーが手動で予算を増やせる。Preset Cap が 0 の場合は、スライダーでも上限なしを選べる。既存シーンは以前の上限を自動的に継承する。統合レンダラーは最大 16,777,216 スプラットに対応し、4M のリソース枠を超えると 16M の枠が選ばれて GPU メモリ使用量が大きく増える場合がある。
 
 レンダーキューとソート／マテリアル設定は `GaussianSplatRenderer` コンポーネントのインスペクターにある。ソートテクスチャを手動で編集する代わりに、そこの `Update Sorting Resource Textures` で最大のスプラットに合わせてリサイズする。
 

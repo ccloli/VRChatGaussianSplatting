@@ -16,6 +16,8 @@ namespace GaussianSplatting.Editor
         SerializedProperty _cameraPositionQuantization;
         SerializedProperty _combinedLodSplatBudgetPC;
         SerializedProperty _combinedLodSplatBudgetAndroid;
+        SerializedProperty _combinedLodGlobalSplatBudgetPC;
+        SerializedProperty _combinedLodGlobalSplatBudgetAndroid;
         SerializedProperty _combinedLodTargetScale;
         SerializedProperty _combinedLodDirectionalBias;
         SerializedProperty _lodMaxSplatsPerPixel;
@@ -51,6 +53,8 @@ namespace GaussianSplatting.Editor
             _cameraPositionQuantization = serializedObject.FindProperty("cameraPositionQuantization");
             _combinedLodSplatBudgetPC = serializedObject.FindProperty("combinedLodSplatBudgetPC");
             _combinedLodSplatBudgetAndroid = serializedObject.FindProperty("combinedLodSplatBudgetAndroid");
+            _combinedLodGlobalSplatBudgetPC = serializedObject.FindProperty("combinedLodGlobalSplatBudgetPC");
+            _combinedLodGlobalSplatBudgetAndroid = serializedObject.FindProperty("combinedLodGlobalSplatBudgetAndroid");
             _combinedLodTargetScale = serializedObject.FindProperty("combinedLodTargetScale");
             _combinedLodDirectionalBias = serializedObject.FindProperty("combinedLodDirectionalBias");
             _lodMaxSplatsPerPixel = serializedObject.FindProperty("lodMaxSplatsPerPixel");
@@ -159,7 +163,7 @@ namespace GaussianSplatting.Editor
             {
                 EditorGUI.showMixedValue = _combinedLodSplatBudgetPC.hasMultipleDifferentValues;
                 EditorGUI.BeginChangeCheck();
-                int nextPcBudget = EditorGUILayout.IntField(GSEditorText.T("Combined LOD PC Cap", "統合 LOD PC 上限", "合并 LOD PC 上限"), _combinedLodSplatBudgetPC.intValue);
+                int nextPcBudget = EditorGUILayout.IntField(GSEditorText.T("LOD PC Preset Cap", "LOD PC プリセット上限"), _combinedLodSplatBudgetPC.intValue);
                 if (EditorGUI.EndChangeCheck())
                 {
                     _combinedLodSplatBudgetPC.intValue = Mathf.Max(0, nextPcBudget);
@@ -170,13 +174,18 @@ namespace GaussianSplatting.Editor
             {
                 EditorGUI.showMixedValue = _combinedLodSplatBudgetAndroid.hasMultipleDifferentValues;
                 EditorGUI.BeginChangeCheck();
-                int nextAndroidBudget = EditorGUILayout.IntField(GSEditorText.T("Combined LOD Android Cap", "統合 LOD Android 上限", "合并 LOD Android 上限"), _combinedLodSplatBudgetAndroid.intValue);
+                int nextAndroidBudget = EditorGUILayout.IntField(GSEditorText.T("LOD Android Preset Cap", "LOD Android プリセット上限"), _combinedLodSplatBudgetAndroid.intValue);
                 if (EditorGUI.EndChangeCheck())
                 {
                     _combinedLodSplatBudgetAndroid.intValue = Mathf.Max(0, nextAndroidBudget);
                 }
                 EditorGUI.showMixedValue = false;
             }
+            DrawGlobalLodCap(_combinedLodGlobalSplatBudgetPC, GSEditorText.T("LOD PC Global Cap", "LOD PC 全体上限"));
+            DrawGlobalLodCap(_combinedLodGlobalSplatBudgetAndroid, GSEditorText.T("LOD Android Global Cap", "LOD Android 全体上限"));
+            EditorGUILayout.HelpBox(GSEditorText.T(
+                "Preset caps set the quality tiers and startup capacity; 0 means no cap, even when a global cap is set. Global caps set the advanced slider maximum; 0 inherits the preset cap, and a smaller value cannot lower it. The combined renderer supports up to 16,777,216 splats.",
+                "プリセット上限は品質と起動時容量を設定し、0 は全体上限の設定に関わらず上限なしです。全体上限は詳細設定スライダーの最大値で、0 はプリセット上限を継承し、小さい値では上限を下げません。統合レンダラーは最大 16,777,216 スプラットに対応します。"), MessageType.None);
             if (_combinedLodTargetScale != null)
             {
                 EditorGUI.showMixedValue = _combinedLodTargetScale.hasMultipleDifferentValues;
@@ -239,19 +248,29 @@ namespace GaussianSplatting.Editor
                     }
                     EditorGUI.showMixedValue = false;
                     int sliderMin = sceneRenderer.GetCombinedLodSplatBudgetSliderMin();
-                    int sliderMax = sceneRenderer.GetCombinedLodSplatBudgetSliderMax();
-                    int resolved = Mathf.Clamp(Mathf.RoundToInt(Mathf.Clamp01(_startupLodCapacity.floatValue) * sliderMax), sliderMin, sliderMax);
-                    EditorGUILayout.LabelField(" ", GSEditorText.T("= " + resolved.ToString("N0") + " splats (PC cap)", "= " + resolved.ToString("N0") + " スプラット (PC 上限)", "= " + resolved.ToString("N0") + " 个 Splat（PC 上限）"));
+                    int presetCap = sceneRenderer.GetCombinedLodSplatBudgetPC();
+                    int resolved = Mathf.Clamp(Mathf.RoundToInt(Mathf.Clamp01(_startupLodCapacity.floatValue) * presetCap), sliderMin, presetCap);
+                    string resolvedText = resolved == 0 ? GSEditorText.T("No cap", "上限なし", "无上限") : resolved.ToString("N0");
+                    EditorGUILayout.LabelField(" ", GSEditorText.T("= " + resolvedText + " (PC preset cap)", "= " + resolvedText + " (PC プリセット上限)"));
                 }
                 int effectiveBudget = sceneRenderer.GetEffectiveCombinedLodSplatBudget();
                 int targetBudget = effectiveBudget > 0 ? Mathf.FloorToInt(effectiveBudget * sceneRenderer.GetEffectiveCombinedLodTargetScale()) : 0;
                 string effective = effectiveBudget == 0 ? GSEditorText.T("No cap", "上限なし", "无上限") : effectiveBudget.ToString();
                 string target = effectiveBudget == 0 ? GSEditorText.T("No cap", "上限なし", "无上限") : targetBudget.ToString();
                 EditorGUILayout.HelpBox(GSEditorText.T(
-                    "Editor previews use the PC cap. Android builds use the Android cap. 0 disables the cap. Effective cap: " + effective + ". LOD selection target: " + target + ".",
-                    "エディタプレビューでは PC 上限を使用します。Android ビルドでは Android 上限を使用します。0 は上限なしです。現在の上限: " + effective + "。LOD 選択目標: " + target + "。",
-                    "编辑器预览使用 PC 上限，Android 构建使用 Android 上限。0 表示无上限。当前上限：" + effective + "。LOD 选择目标：" + target + "。"), MessageType.None);
+                    "Editor previews use the PC preset cap. Android builds use the Android preset cap. Effective cap: " + effective + ". LOD selection target: " + target + ".",
+                    "エディタプレビューでは PC プリセット上限を使用します。Android ビルドでは Android プリセット上限を使用します。現在の上限: " + effective + "。LOD 選択目標: " + target + "。"), MessageType.None);
             }
+        }
+
+        static void DrawGlobalLodCap(SerializedProperty property, string label)
+        {
+            if (property == null) return;
+            EditorGUI.showMixedValue = property.hasMultipleDifferentValues;
+            EditorGUI.BeginChangeCheck();
+            int value = EditorGUILayout.IntField(label, property.intValue);
+            if (EditorGUI.EndChangeCheck()) property.intValue = Mathf.Clamp(value, 0, 1 << 24);
+            EditorGUI.showMixedValue = false;
         }
 
         static int CountActiveSceneLODObjects(GaussianSplatRenderer renderer)
