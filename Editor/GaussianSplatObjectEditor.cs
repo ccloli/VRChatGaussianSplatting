@@ -46,7 +46,23 @@ namespace GaussianSplatting.Editor
 
             serializedObject.Update();
             DrawEditableMetadata();
-            serializedObject.ApplyModifiedProperties();
+            if (serializedObject.ApplyModifiedProperties())
+            {
+                foreach (GaussianSplatRendererUI ui in Resources.FindObjectsOfTypeAll<GaussianSplatRendererUI>())
+                {
+                    if (ui != null && !EditorUtility.IsPersistent(ui) && ui.galleryObjects != null)
+                    {
+                        foreach (GaussianSplatObject obj in ui.galleryObjects)
+                        {
+                            if (obj != null && System.Array.IndexOf(targets, obj) >= 0)
+                            {
+                                GaussianSplatUiBuilder.EnsureAuthorTextCharacters(ui);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
 
             if (!serializedObject.isEditingMultipleObjects)
             {
@@ -68,9 +84,9 @@ namespace GaussianSplatting.Editor
         void DrawEditableMetadata()
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.LabelField(GSEditorText.T("Display Metadata", "表示メタデータ"), EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(_splatName, GSEditorText.C("Display Name", "表示名"));
-            EditorGUILayout.PropertyField(_description, GSEditorText.C("Description", "説明"));
+            EditorGUILayout.LabelField(GSEditorText.T("Display Metadata", "表示メタデータ", "显示元数据"), EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(_splatName, GSEditorText.C("Display Name", "表示名", "显示名称"));
+            EditorGUILayout.PropertyField(_description, GSEditorText.C("Description", "説明", "描述"));
             EditorGUILayout.EndVertical();
         }
 
@@ -78,45 +94,45 @@ namespace GaussianSplatting.Editor
         {
             GaussianSplatImporter.ImportMetadata metadata = TryParseMetadata(lo);
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.LabelField(GSEditorText.T("Imported Data (read-only)", "インポート済みデータ（読み取り専用）"), EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(GSEditorText.T("Imported Data (read-only)", "インポート済みデータ（読み取り専用）", "已导入数据（只读）"), EditorStyles.boldLabel);
 
             int posFiles = lo.positions != null ? lo.positions.Length : 0;
             int shFiles = lo.sh != null ? lo.sh.Length : 0;
             long storedSplats = SumInts(lo.fileSplatCounts);
-            DrawInfoRow(GSEditorText.T("Import Mode", "インポートモード"), ImportModeLabel(lo, metadata));
-            DrawInfoRow(GSEditorText.T("Renderable", "描画可能"), YesNo(lo.IsRenderable()));
+            DrawInfoRow(GSEditorText.T("Import Mode", "インポートモード", "导入模式"), ImportModeLabel(lo, metadata));
+            DrawInfoRow(GSEditorText.T("Renderable", "描画可能", "可渲染"), YesNo(lo.IsRenderable()));
             if (metadata != null)
             {
-                DrawInfoRow(GSEditorText.T("Source", "ソース"), string.IsNullOrEmpty(metadata.sourcePath) ? "-" : metadata.sourcePath);
-                DrawInfoRow(GSEditorText.T("Prefab", "Prefab"), string.IsNullOrEmpty(metadata.prefabPath) ? "-" : metadata.prefabPath);
+                DrawInfoRow(GSEditorText.T("Source", "ソース", "来源"), string.IsNullOrEmpty(metadata.sourcePath) ? "-" : metadata.sourcePath);
+                DrawInfoRow(GSEditorText.T("Prefab", "Prefab", "Prefab"), string.IsNullOrEmpty(metadata.prefabPath) ? "-" : metadata.prefabPath);
             }
-            DrawInfoRow(GSEditorText.T("Splat Count", "Splat 数"), lo.totalSplatCount.ToString("N0"));
-            DrawInfoRow(GSEditorText.T("Stored Splat Texels", "保存済み Splat テクセル"), storedSplats > 0 ? storedSplats.ToString("N0") : "-");
-            DrawInfoRow(GSEditorText.T("Texture Sets", "テクスチャセット"), posFiles.ToString("N0"));
-            DrawInfoRow(GSEditorText.T("SH Texture Sets", "SH テクスチャセット"), shFiles.ToString("N0"));
-            DrawInfoRow(GSEditorText.T("Chunk Count", "チャンク数"), lo.chunkCount.ToString("N0"));
-            DrawInfoRow(GSEditorText.T("Chunk Size", "チャンクサイズ"), lo.chunkSize.ToString("N0"));
-            DrawInfoRow(GSEditorText.T("Position Encoding", "位置エンコード"), lo.usePackedPositions ? "Packed RGBA32" : "RGBAFloat");
-            DrawInfoRow(GSEditorText.T("Max SH Band", "最大 SH バンド"), "SH" + lo.GetMaxSHBand());
-            DrawInfoRow(GSEditorText.T("SH Coefficients", "SH 係数"), ShCoeffSummary(lo));
-            DrawInfoRow(GSEditorText.T("LOD Reused Splats", "LOD 再利用 Splat"), lo.GetLodReusePercent() + "%");
-            DrawInfoRow(GSEditorText.T("Bounds Center", "境界中心"), FormatVector((lo.boundsMin + lo.boundsMax) * 0.5f));
-            DrawInfoRow(GSEditorText.T("Bounds Size", "境界サイズ"), FormatVector(lo.boundsMax - lo.boundsMin));
-            DrawInfoRow(GSEditorText.T("Bounds Min", "境界 Min"), FormatVector(lo.boundsMin));
-            DrawInfoRow(GSEditorText.T("Bounds Max", "境界 Max"), FormatVector(lo.boundsMax));
+            DrawInfoRow(GSEditorText.T("Splat Count", "Splat 数", "Splat 数量"), lo.totalSplatCount.ToString("N0"));
+            DrawInfoRow(GSEditorText.T("Stored Splat Texels", "保存済み Splat テクセル", "存储的 Splat 纹素"), storedSplats > 0 ? storedSplats.ToString("N0") : "-");
+            DrawInfoRow(GSEditorText.T("Texture Sets", "テクスチャセット", "纹理组"), posFiles.ToString("N0"));
+            DrawInfoRow(GSEditorText.T("SH Texture Sets", "SH テクスチャセット", "SH 纹理组"), shFiles.ToString("N0"));
+            DrawInfoRow(GSEditorText.T("Chunk Count", "チャンク数", "分块数量"), lo.chunkCount.ToString("N0"));
+            DrawInfoRow(GSEditorText.T("Chunk Size", "チャンクサイズ", "分块大小"), lo.chunkSize.ToString("N0"));
+            DrawInfoRow(GSEditorText.T("Position Encoding", "位置エンコード", "位置编码"), lo.usePackedPositions ? "Packed RGBA32" : "RGBAFloat");
+            DrawInfoRow(GSEditorText.T("Max SH Band", "最大 SH バンド", "最大 SH 阶数"), "SH" + lo.GetMaxSHBand());
+            DrawInfoRow(GSEditorText.T("SH Coefficients", "SH 係数", "SH 系数"), ShCoeffSummary(lo));
+            DrawInfoRow(GSEditorText.T("LOD Reused Splats", "LOD 再利用 Splat", "LOD 复用 Splat"), lo.GetLodReusePercent() + "%");
+            DrawInfoRow(GSEditorText.T("Bounds Center", "境界中心", "边界中心"), FormatVector((lo.boundsMin + lo.boundsMax) * 0.5f));
+            DrawInfoRow(GSEditorText.T("Bounds Size", "境界サイズ", "边界大小"), FormatVector(lo.boundsMax - lo.boundsMin));
+            DrawInfoRow(GSEditorText.T("Bounds Min", "境界 Min", "边界最小值"), FormatVector(lo.boundsMin));
+            DrawInfoRow(GSEditorText.T("Bounds Max", "境界 Max", "边界最大值"), FormatVector(lo.boundsMax));
             Texture2D pos0 = (lo.positions != null && lo.positions.Length > 0) ? lo.positions[0] : null;
-            DrawInfoRow(GSEditorText.T("Position Resolution", "位置テクスチャ解像度"),
-                pos0 != null ? $"{pos0.width} x {pos0.height}" : GSEditorText.T("Unknown", "不明"));
+            DrawInfoRow(GSEditorText.T("Position Resolution", "位置テクスチャ解像度", "位置纹理分辨率"),
+                pos0 != null ? $"{pos0.width} x {pos0.height}" : GSEditorText.T("Unknown", "不明", "未知"));
             if (lo.chunkBoundsMinTexture != null)
             {
-                DrawInfoRow(GSEditorText.T("Chunk Metadata", "チャンクメタデータ"),
+                DrawInfoRow(GSEditorText.T("Chunk Metadata", "チャンクメタデータ", "分块元数据"),
                     $"{lo.chunkBoundsMinTexture.width} x {lo.chunkBoundsMinTexture.height}, layout {FormatVector4(lo.chunkTextureLayout)}");
             }
-            DrawInfoRow(GSEditorText.T("Estimated GPU Memory", "推定 GPU メモリ"), EditorUtility.FormatBytes(EstimateFootprint(lo)));
+            DrawInfoRow(GSEditorText.T("Estimated GPU Memory", "推定 GPU メモリ", "预计 GPU 显存"), EditorUtility.FormatBytes(EstimateFootprint(lo)));
 
             EditorGUILayout.EndVertical();
 
-            _showTextureSets = EditorGUILayout.Foldout(_showTextureSets, GSEditorText.T("Texture Sets", "テクスチャセット"), true);
+            _showTextureSets = EditorGUILayout.Foldout(_showTextureSets, GSEditorText.T("Texture Sets", "テクスチャセット", "纹理组"), true);
             if (_showTextureSets)
             {
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
@@ -126,18 +142,18 @@ namespace GaussianSplatting.Editor
 
             // Read-only listing of the source textures (name/dims/size only - no object fields, no thumbnails,
             // so expanding this never decodes the textures).
-            _showSourceTextures = EditorGUILayout.Foldout(_showSourceTextures, GSEditorText.T("Source Textures", "ソーステクスチャ"), true);
+            _showSourceTextures = EditorGUILayout.Foldout(_showSourceTextures, GSEditorText.T("Source Textures", "ソーステクスチャ", "源纹理"), true);
             if (_showSourceTextures)
             {
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-                DrawTextureArray(GSEditorText.T("Positions", "位置"), lo.positions);
-                DrawTextureArray(GSEditorText.T("Colors", "色"), lo.colors);
-                DrawTextureArray(GSEditorText.T("Rotations", "回転"), lo.rotations);
-                DrawTextureArray(GSEditorText.T("Scales", "スケール"), lo.scales);
-                DrawTextureArray(GSEditorText.T("SH", "SH"), lo.sh);
-                DrawTextureRow(GSEditorText.T("Chunk Bounds Min", "チャンク境界 Min"), lo.chunkBoundsMinTexture);
-                DrawTextureRow(GSEditorText.T("Chunk Bounds Max", "チャンク境界 Max"), lo.chunkBoundsMaxTexture);
-                DrawTextureRow(GSEditorText.T("Chunk Range", "チャンクレンジ"), lo.chunkRangeTexture);
+                DrawTextureArray(GSEditorText.T("Positions", "位置", "位置"), lo.positions);
+                DrawTextureArray(GSEditorText.T("Colors", "色", "颜色"), lo.colors);
+                DrawTextureArray(GSEditorText.T("Rotations", "回転", "旋转"), lo.rotations);
+                DrawTextureArray(GSEditorText.T("Scales", "スケール", "缩放"), lo.scales);
+                DrawTextureArray(GSEditorText.T("SH", "SH", "SH"), lo.sh);
+                DrawTextureRow(GSEditorText.T("Chunk Bounds Min", "チャンク境界 Min", "分块边界最小值"), lo.chunkBoundsMinTexture);
+                DrawTextureRow(GSEditorText.T("Chunk Bounds Max", "チャンク境界 Max", "分块边界最大值"), lo.chunkBoundsMaxTexture);
+                DrawTextureRow(GSEditorText.T("Chunk Range", "チャンクレンジ", "分块范围"), lo.chunkRangeTexture);
                 EditorGUILayout.EndVertical();
             }
         }
@@ -152,7 +168,7 @@ namespace GaussianSplatting.Editor
         {
             if (metadata != null && metadata.options.standalone)
             {
-                return "Standalone";
+                return GSEditorText.T("Standalone", "スタンドアロン", "独立渲染");
             }
             return "LOD";
         }
@@ -162,7 +178,7 @@ namespace GaussianSplatting.Editor
             int setCount = lo.positions != null ? lo.positions.Length : 0;
             if (setCount == 0)
             {
-                EditorGUILayout.LabelField(GSEditorText.T("No texture sets.", "テクスチャセットがありません。"));
+                EditorGUILayout.LabelField(GSEditorText.T("No texture sets.", "テクスチャセットがありません。", "没有纹理组。"));
                 return;
             }
             for (int i = 0; i < setCount; i++)
@@ -171,15 +187,15 @@ namespace GaussianSplatting.Editor
                 int shCoeff = lo.fileShCoeffCounts != null && i < lo.fileShCoeffCounts.Length ? lo.fileShCoeffCounts[i] : 0;
                 Texture2D pos = lo.positions[i];
                 string resolution = pos != null ? $"{pos.width}x{pos.height}" : "-";
-                string value = $"{splats:N0} splats, {resolution}, {ShCoeffLabel(shCoeff)}, {EditorUtility.FormatBytes(TextureSetBytes(lo, i))}";
-                DrawInfoRow("Set " + i, value);
+                string value = GSEditorText.T($"{splats:N0} splats", $"{splats:N0} Splat", $"{splats:N0} 个 Splat") + $", {resolution}, {ShCoeffLabel(shCoeff)}, {EditorUtility.FormatBytes(TextureSetBytes(lo, i))}";
+                DrawInfoRow(GSEditorText.T("Set ", "セット ", "组 ") + i, value);
             }
         }
 
         void DrawTextureArray(string label, Texture2D[] arr)
         {
             int n = arr != null ? arr.Length : 0;
-            EditorGUILayout.LabelField(label, n + GSEditorText.T(" file(s)", " 個"));
+            EditorGUILayout.LabelField(label, n + GSEditorText.T(" file(s)", " 個", " 个文件"));
             if (arr == null)
             {
                 return;
@@ -196,7 +212,7 @@ namespace GaussianSplatting.Editor
         {
             string value = t != null
                 ? $"{t.name}  ({t.width}x{t.height} {(t as Texture2D)?.format})  {EditorUtility.FormatBytes(StorageBytes(t))}"
-                : GSEditorText.T("(none)", "（なし）");
+                : GSEditorText.T("(none)", "（なし）", "（无）");
             DrawInfoRow(label, value);
         }
 
@@ -279,7 +295,7 @@ namespace GaussianSplatting.Editor
 
         static string YesNo(bool value)
         {
-            return value ? GSEditorText.T("Yes", "はい") : GSEditorText.T("No", "いいえ");
+            return value ? GSEditorText.T("Yes", "はい", "是") : GSEditorText.T("No", "いいえ", "否");
         }
 
         static string FormatVector(Vector3 v)

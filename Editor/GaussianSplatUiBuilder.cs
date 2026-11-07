@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Text;
 using TMPro;
 using UdonSharp;
 using UdonSharpEditor;
@@ -22,6 +23,7 @@ namespace GaussianSplatting.Editor
         const float DefaultLODSplatCapSlider = 0.89164376f;
         const string UiFontAssetPath = "Assets/VRChatGaussianSplatting/Resources/Fonts/NotoSansJP-VF.ttf";
         const string UiTextMeshProFontAssetPath = "Assets/VRChatGaussianSplatting/Resources/Fonts/NotoSansJP-VF TMP.asset";
+        const string ChineseTextMeshProFontAssetGuid = "f76ee1974fbcc624098cb6a8a964d2dc";
         const string UiMaterialFolderPath = "Assets/VRChatGaussianSplatting/Resources/Materials";
         const string SupersampledUiMaterialAssetPath = UiMaterialFolderPath + "/GaussianSplatUISupersampled.mat";
         const string VrChatSupersampledUiShaderName = "VRChat/Mobile/Worlds/Supersampled UI";
@@ -35,6 +37,7 @@ namespace GaussianSplatting.Editor
         static Type _cachedVrChatUiShapeType;
         static Material _cachedSupersampledUiMaterial;
         static TMP_FontAsset _cachedUiTextMeshProFont;
+        static TMP_FontAsset _cachedChineseFont;
         static bool _autoRefreshQueued = true;
 
         [InitializeOnLoadMethod]
@@ -44,9 +47,24 @@ namespace GaussianSplatting.Editor
             EditorApplication.hierarchyChanged += QueueAutoRefresh;
             EditorApplication.update -= ProcessAutoRefresh;
             EditorApplication.update += ProcessAutoRefresh;
+            Undo.postprocessModifications -= QueueTextChanges;
+            Undo.postprocessModifications += QueueTextChanges;
         }
 
         static void QueueAutoRefresh() { _autoRefreshQueued = true; }
+
+        static UndoPropertyModification[] QueueTextChanges(UndoPropertyModification[] modifications)
+        {
+            foreach (UndoPropertyModification modification in modifications)
+            {
+                if (modification.currentValue != null && modification.currentValue.target is TMP_Text && modification.currentValue.propertyPath == "m_text")
+                {
+                    QueueAutoRefresh();
+                    break;
+                }
+            }
+            return modifications;
+        }
 
         static void ProcessAutoRefresh()
         {
@@ -56,7 +74,14 @@ namespace GaussianSplatting.Editor
             for (int i = 0; i < renderers.Length; i++)
             {
                 GaussianSplatRenderer renderer = renderers[i];
-                if (renderer == null || renderer != GaussianSplatRenderer.FindExistingSceneRenderer(renderer.gameObject.scene) || EditorUtility.IsPersistent(renderer) || UnityEditor.SceneManagement.EditorSceneManager.IsPreviewScene(renderer.gameObject.scene) || renderer.transform.Find("Gaussian Splat UI") != null) continue;
+                if (renderer == null || renderer != GaussianSplatRenderer.FindExistingSceneRenderer(renderer.gameObject.scene) || EditorUtility.IsPersistent(renderer) || UnityEditor.SceneManagement.EditorSceneManager.IsPreviewScene(renderer.gameObject.scene)) continue;
+                Transform existingUi = renderer.transform.Find("Gaussian Splat UI");
+                if (existingUi != null)
+                {
+                    GaussianSplatRendererUI ui = existingUi.GetComponentInChildren<GaussianSplatRendererUI>(true);
+                    if (ui != null) UpgradeExistingUi(ui);
+                    continue;
+                }
                 if (SceneHasSplatContent(renderer.gameObject.scene))
                 {
                     Generate(renderer, false);
@@ -101,25 +126,42 @@ namespace GaussianSplatting.Editor
 
         static string GetUiTextCharacterSet()
         {
-            HashSet<char> characters = new HashSet<char>();
-            for (int code = 32; code <= 126; code++)
-            {
-                characters.Add((char)code);
-            }
-
-            const string localizedCharacters = "表示モード統合単体現在のスプラットなし再ソートするカメラ移動量をフレームに分散毎マテリアル設定バンド共有光源強度アンチエイリアスアルファカットオフ低いほど高品質言語上へ下開発有効中日本語オンオフ示ライトボリュームガウスケールカリング減少距離最";
-            for (int i = 0; i < localizedCharacters.Length; i++)
-            {
-                characters.Add(localizedCharacters[i]);
-            }
-
-            char[] result = new char[characters.Count];
-            characters.CopyTo(result);
-            Array.Sort(result);
-            return new string(result);
+            // Read UI sources so new localized strings do not require a separate hand-maintained character list.
+            StringBuilder text = new StringBuilder();
+            for (char c = ' '; c <= '~'; c++) text.Append(c);
+            AppendSourceText(text, "e6a9d84f0d1147f3b3e8b96a0af67c41"); // GaussianSplatRendererUI.cs
+            AppendSourceText(text, "7a11c85e498d7854dbd166baada1b739"); // GaussianSplatUiBuilder.cs
+            return text.ToString();
         }
 
-        static bool EnsureUiTextCharacters(TMP_FontAsset fontAsset)
+        static void AppendSourceText(StringBuilder text, string guid)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            if (!string.IsNullOrEmpty(path) && File.Exists(path)) text.Append(File.ReadAllText(path));
+        }
+
+        static uint[] GetCodePoints(string text)
+        {
+            HashSet<uint> result = new HashSet<uint>();
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (char.IsHighSurrogate(c) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
+                {
+                    result.Add((uint)char.ConvertToUtf32(c, text[++i]));
+                }
+                else if (!char.IsSurrogate(c) && !char.IsControl(c))
+                {
+                    result.Add(c);
+                }
+            }
+            uint[] codePoints = new uint[result.Count];
+            result.CopyTo(codePoints);
+            Array.Sort(codePoints);
+            return codePoints;
+        }
+
+        static bool EnsureUiTextCharacters(TMP_FontAsset fontAsset, string characters = null)
         {
             if (fontAsset == null)
             {
@@ -127,8 +169,10 @@ namespace GaussianSplatting.Editor
             }
 
             int previousCharacterCount = fontAsset.characterTable != null ? fontAsset.characterTable.Count : 0;
-            string missingCharacters;
-            fontAsset.TryAddCharacters(GetUiTextCharacterSet(), out missingCharacters);
+            uint[] codePoints = GetCodePoints(characters ?? GetUiTextCharacterSet());
+            if (codePoints.Length == 0) return false;
+            uint[] missingCharacters;
+            fontAsset.TryAddCharacters(codePoints, out missingCharacters);
             bool changed = (fontAsset.characterTable != null ? fontAsset.characterTable.Count : 0) != previousCharacterCount;
             if (changed && fontAsset.atlasTextures != null)
             {
@@ -136,7 +180,13 @@ namespace GaussianSplatting.Editor
                 {
                     if (fontAsset.atlasTextures[atlasIndex] != null)
                     {
-                        EditorUtility.SetDirty(fontAsset.atlasTextures[atlasIndex]);
+                        Texture atlas = fontAsset.atlasTextures[atlasIndex];
+                        if (!AssetDatabase.Contains(atlas) && AssetDatabase.Contains(fontAsset))
+                        {
+                            atlas.hideFlags = HideFlags.None;
+                            AssetDatabase.AddObjectToAsset(atlas, fontAsset);
+                        }
+                        EditorUtility.SetDirty(atlas);
                     }
                 }
             }
@@ -161,6 +211,7 @@ namespace GaussianSplatting.Editor
             bool preservedGalleryMasterLock = true;
             string preservedCustomSubtitleEnglish = null;
             string preservedCustomSubtitleJapanese = null;
+            string preservedCustomSubtitleChinese = null;
             int preservedGallerySelectedIndex = 0;
             if (existingUi != null)
             {
@@ -172,6 +223,7 @@ namespace GaussianSplatting.Editor
                     preservedGalleryMasterLock = existingGeneratedUi.galleryMasterLock;
                     preservedCustomSubtitleEnglish = existingGeneratedUi.customSubtitleEnglish;
                     preservedCustomSubtitleJapanese = existingGeneratedUi.customSubtitleJapanese;
+                    preservedCustomSubtitleChinese = existingGeneratedUi.customSubtitleChinese;
                     preservedGallerySelectedIndex = ReadGallerySelectedIndex(existingGeneratedUi);
                 }
                 Undo.DestroyObjectImmediate(existingUi.gameObject);
@@ -260,8 +312,11 @@ namespace GaussianSplatting.Editor
             Button japaneseLanguageButton = CreateButtonElement("Japanese Button", languageRow.transform, "日本語", new Color(0.2f, 0.2f, 0.24f, 1.0f), 0.0f, 1.0f);
             generatedUi.englishLanguageButton = englishLanguageButton;
             generatedUi.japaneseLanguageButton = japaneseLanguageButton;
+            generatedUi.chineseLanguageButton = CreateButtonElement("Chinese Button", languageRow.transform, "简体中文", new Color(0.2f, 0.2f, 0.24f, 1.0f), 0.0f, 1.0f);
+            GetChineseFont();
             AddUdonSharpButtonEvent(englishLanguageButton, generatedUi, nameof(GaussianSplatRendererUI.SetLanguageEnglish));
             AddUdonSharpButtonEvent(japaneseLanguageButton, generatedUi, nameof(GaussianSplatRendererUI.SetLanguageJapanese));
+            AddUdonSharpButtonEvent(generatedUi.chineseLanguageButton, generatedUi, nameof(GaussianSplatRendererUI.SetLanguageChineseSimplified));
 
             generatedUi.qualitySectionText = CreateTextElement("Quality Section", settingsColumn.transform, "Quality", 18, TextAnchor.MiddleLeft);
             GameObject qualityRow = CreateHorizontalGroup("Quality Row", settingsColumn.transform, 8.0f, false);
@@ -301,10 +356,12 @@ namespace GaussianSplatting.Editor
             generatedUi.galleryMasterLock = preservedGalleryMasterLock;
             generatedUi.customSubtitleEnglish = preservedCustomSubtitleEnglish;
             generatedUi.customSubtitleJapanese = preservedCustomSubtitleJapanese;
+            generatedUi.customSubtitleChinese = preservedCustomSubtitleChinese;
             WriteGallerySelectedIndex(generatedUi, preservedGallerySelectedIndex);
             // Rebuild the gallery section (Body Row child) from the restored list.
             InvokeSyncEditorSerializedState(generatedUi);
 
+            EnsureAuthorTextCharacters(generatedUi);
             generatedUi.RefreshUI();
             EditorUtility.SetDirty(canvasObject);
             EditorUtility.SetDirty(renderer);
@@ -406,6 +463,123 @@ namespace GaussianSplatting.Editor
             }
         }
 
+        static TMP_FontAsset GetChineseFont()
+        {
+            if (_cachedChineseFont != null) return _cachedChineseFont;
+            TMP_FontAsset font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(AssetDatabase.GUIDToAssetPath(ChineseTextMeshProFontAssetGuid));
+            if (font != null)
+            {
+                bool changed = EnsureUiTextCharacters(font);
+                TMP_FontAsset japanese = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(UiTextMeshProFontAssetPath);
+                changed |= EnsureFontFallback(font, japanese);
+                Material material = font.material;
+                Shader shader = Shader.Find(TmpTextShaderName);
+                if (material != null)
+                {
+                    if (shader != null && material.shader != shader) { material.shader = shader; changed = true; }
+                    if (font.atlasTexture != null && material.mainTexture != font.atlasTexture) { material.mainTexture = font.atlasTexture; changed = true; }
+                    if (changed) EditorUtility.SetDirty(material);
+                }
+                if (changed)
+                {
+                    EditorUtility.SetDirty(font);
+                    AssetDatabase.SaveAssets();
+                }
+            }
+            _cachedChineseFont = font;
+            return font;
+        }
+
+        static bool EnsureFontFallback(TMP_FontAsset font, TMP_FontAsset fallback)
+        {
+            if (font == null || fallback == null || font == fallback) return false;
+            if (font.fallbackFontAssetTable == null) font.fallbackFontAssetTable = new List<TMP_FontAsset>();
+            if (font.fallbackFontAssetTable.Count > 0 && font.fallbackFontAssetTable[0] == fallback) return false;
+            font.fallbackFontAssetTable.Remove(fallback);
+            font.fallbackFontAssetTable.Insert(0, fallback);
+            return true;
+        }
+
+        // Existing generated panels are upgraded in place so authored layout and gallery settings survive.
+        static void UpgradeExistingUi(GaussianSplatRendererUI ui)
+        {
+            Transform row = ui.transform.Find("Panel/Body Row/Settings Column/Language Row");
+            if (row == null) return;
+            bool changed = false;
+            GetUiTextMeshProFont();
+            GetChineseFont();
+            if (ui.chineseLanguageButton == null)
+            {
+                Transform existing = row.Find("Chinese Button");
+                ui.chineseLanguageButton = existing != null ? existing.GetComponent<Button>() : null;
+                if (ui.chineseLanguageButton == null)
+                {
+                    ui.chineseLanguageButton = CreateButtonElement("Chinese Button", row, "简体中文", new Color(0.2f, 0.2f, 0.24f, 1.0f), 0.0f, 1.0f);
+                    Undo.RegisterCreatedObjectUndo(ui.chineseLanguageButton.gameObject, "Add Chinese language button");
+                    AddUdonSharpButtonEvent(ui.chineseLanguageButton, ui, nameof(GaussianSplatRendererUI.SetLanguageChineseSimplified));
+                }
+                changed = true;
+            }
+            if (ui.chineseLanguageButton != null && ui.chineseLanguageButton.onClick.GetPersistentEventCount() == 0)
+            {
+                AddUdonSharpButtonEvent(ui.chineseLanguageButton, ui, nameof(GaussianSplatRendererUI.SetLanguageChineseSimplified));
+                if (ui.chineseLanguageButton.onClick.GetPersistentEventCount() > 0) changed = true;
+            }
+            if (ui.socialPanel != null)
+            {
+                Transform content = ui.socialPanel.transform.Find("Window Content");
+                if (content != null)
+                {
+                    if (ui.socialTitleText == null)
+                    {
+                        Transform title = content.Find("Window Title");
+                        if (title != null) { ui.socialTitleText = title.GetComponent<TextMeshProUGUI>(); changed = true; }
+                    }
+                    if (ui.socialCloseButton == null)
+                    {
+                        Transform close = content.Find("Social Close");
+                        if (close != null) { ui.socialCloseButton = close.GetComponent<Button>(); changed = true; }
+                    }
+                }
+            }
+            EnsureAuthorTextCharacters(ui);
+            if (changed)
+            {
+                UdonSharpEditorUtility.CopyProxyToUdon(ui);
+                EditorUtility.SetDirty(ui);
+                UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(ui.gameObject.scene);
+                ui.RefreshUI();
+            }
+        }
+
+        internal static void EnsureAuthorTextCharacters(GaussianSplatRendererUI ui)
+        {
+            if (ui == null) return;
+            StringBuilder characters = new StringBuilder();
+            characters.Append(ui.customSubtitleEnglish).Append(ui.customSubtitleJapanese).Append(ui.customSubtitleChinese);
+            if (ui.galleryObjects != null)
+            {
+                foreach (GaussianSplatObject obj in ui.galleryObjects)
+                {
+                    if (obj != null) characters.Append(obj.splatName).Append(obj.description).Append(obj.gameObject.name);
+                }
+            }
+            TextMeshProUGUI[] labels = ui.GetComponentsInChildren<TextMeshProUGUI>(true);
+            foreach (TextMeshProUGUI label in labels)
+            {
+                if (label != null) characters.Append(label.text);
+            }
+            if (characters.Length == 0) return;
+            string text = characters.ToString();
+            TMP_FontAsset japaneseFont = GetUiTextMeshProFont();
+            TMP_FontAsset chineseFont = GetChineseFont();
+            bool japaneseChanged = EnsureUiTextCharacters(japaneseFont, text);
+            bool chineseChanged = EnsureUiTextCharacters(chineseFont, text);
+            if (japaneseChanged) EditorUtility.SetDirty(japaneseFont);
+            if (chineseChanged) EditorUtility.SetDirty(chineseFont);
+            if (japaneseChanged || chineseChanged) AssetDatabase.SaveAssets();
+        }
+
         static TMP_FontAsset GetUiTextMeshProFont()
         {
             if (_cachedUiTextMeshProFont != null)
@@ -417,20 +591,10 @@ namespace GaussianSplatting.Editor
             Font uiFont = AssetDatabase.LoadAssetAtPath<Font>(UiFontAssetPath);
             bool changed = false;
 
-            if (uiTextMeshProFont != null)
+            // Keep existing font assets and their GUIDs: scenes and the Chinese fallback reference them.
+            if (uiTextMeshProFont != null && (uiTextMeshProFont.material == null || uiTextMeshProFont.atlasTexture == null))
             {
-                bool recreateFontAsset = uiTextMeshProFont.material == null ||
-                    uiTextMeshProFont.atlasTexture == null ||
-                    uiTextMeshProFont.atlasRenderMode != UiTextMeshProGlyphRenderMode ||
-                    uiTextMeshProFont.atlasPadding != UiTextMeshProAtlasPadding ||
-                    uiTextMeshProFont.atlasTexture.width != UiTextMeshProAtlasSize ||
-                    uiTextMeshProFont.atlasTexture.height != UiTextMeshProAtlasSize ||
-                    uiTextMeshProFont.material.mainTexture != uiTextMeshProFont.atlasTexture;
-                if (recreateFontAsset)
-                {
-                    AssetDatabase.DeleteAsset(UiTextMeshProFontAssetPath);
-                    uiTextMeshProFont = null;
-                }
+                return TMP_Settings.defaultFontAsset;
             }
 
             if (uiTextMeshProFont == null && uiFont != null)
@@ -507,6 +671,10 @@ namespace GaussianSplatting.Editor
                 changed = true;
             }
             if (EnsureUiTextCharacters(uiTextMeshProFont))
+            {
+                changed = true;
+            }
+            if (EnsureFontFallback(uiTextMeshProFont, AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(AssetDatabase.GUIDToAssetPath(ChineseTextMeshProFontAssetGuid))))
             {
                 changed = true;
             }
@@ -841,7 +1009,7 @@ namespace GaussianSplatting.Editor
             VerticalLayoutGroup contentLayout = content.GetComponent<VerticalLayoutGroup>();
             if (contentLayout != null) { contentLayout.childForceExpandWidth = false; contentLayout.childForceExpandHeight = false; contentLayout.childAlignment = TextAnchor.UpperCenter; }
 
-            CreateTextElement("Window Title", content.transform, "Scan or copy the link", 18, TextAnchor.MiddleCenter);
+            ui.socialTitleText = CreateTextElement("Window Title", content.transform, "Scan or copy the link", 18, TextAnchor.MiddleCenter);
 
             RectTransform qrRect = CreateRectTransform("Social QR", content.transform, new Vector2(400.0f, 400.0f));
             Image qrImage = qrRect.gameObject.AddComponent<Image>();
@@ -859,6 +1027,7 @@ namespace GaussianSplatting.Editor
             SetPreferredWidth(urlField.gameObject, 432.0f, 0.0f);
 
             Button closeButton = CreateButtonElement("Social Close", content.transform, "Close", new Color(0.3f, 0.16f, 0.14f, 1.0f), 180.0f, 0.0f);
+            ui.socialCloseButton = closeButton;
             AddUdonSharpButtonEvent(closeButton, ui, nameof(GaussianSplatRendererUI.CloseSocial));
 
             window.gameObject.SetActive(false);

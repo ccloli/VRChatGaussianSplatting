@@ -18,15 +18,21 @@ public static class GSEditorText
         .GetType("UnityEditor.LocalizationDatabase")
         ?.GetProperty("currentEditorLanguage", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
 
-    public static string T(string english, string japanese)
+    public static string T(string english, string japanese, string chinese)
     {
-        return GetEditorLanguage() == SystemLanguage.Japanese ? japanese : english;
+        return Select(GetEditorLanguage(), english, japanese, chinese);
     }
 
-    public static GUIContent C(string english, string japanese)
+    internal static string Select(SystemLanguage language, string english, string japanese, string chinese)
     {
-        return new GUIContent(T(english, japanese));
+        if (language == SystemLanguage.Japanese) return japanese;
+        if (language == SystemLanguage.ChineseSimplified || language == SystemLanguage.Chinese) return chinese;
+        return english;
     }
+
+    public static string T(string english, string japanese) { return T(english, japanese, english); }
+    public static GUIContent C(string english, string japanese, string chinese) { return new GUIContent(T(english, japanese, chinese)); }
+    public static GUIContent C(string english, string japanese) { return new GUIContent(T(english, japanese)); }
 
     static SystemLanguage GetEditorLanguage()
     {

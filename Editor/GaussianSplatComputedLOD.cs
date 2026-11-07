@@ -229,8 +229,8 @@ namespace GaussianSplatting
             int firstChunk = pendingChunks[0].chunkIndex;
             int lastChunk = pendingChunks[pendingChunks.Count - 1].chunkIndex;
             int totalChunkCount = lastChunk + 1; // progress estimate only; total chunk count is not known up front
-            EditorUtility.DisplayProgressBar("Import Gaussian Splat LOD",
-                $"Computing LOD splats for chunks {firstChunk + 1:N0}-{lastChunk + 1:N0} ({pendingChunks.Count:N0} chunks)", 0.25f + 0.55f * (firstChunk / (float)Mathf.Max(1, totalChunkCount)));
+            EditorUtility.DisplayProgressBar(GSEditorText.T("Import Gaussian Splat LOD", "Gaussian Splat LOD をインポート", "导入 Gaussian Splat LOD"),
+                GSEditorText.T($"Computing LOD splats for chunks {firstChunk + 1:N0}-{lastChunk + 1:N0} ({pendingChunks.Count:N0} chunks)", $"チャンク {firstChunk + 1:N0}-{lastChunk + 1:N0} の LOD Splat を計算中（{pendingChunks.Count:N0} チャンク）", $"正在计算分块 {firstChunk + 1:N0}-{lastChunk + 1:N0} 的 LOD Splat（共 {pendingChunks.Count:N0} 个分块）"), 0.25f + 0.55f * (firstChunk / (float)Mathf.Max(1, totalChunkCount)));
 
             int shCoeffCount = sh != null ? sh.coeffCount : 0;
             bool didResample = ResamplePendingChunksGpu(shader, pendingChunks, chunkSize, resamplePercent, totalChunkCount, shCoeffCount);
@@ -387,16 +387,16 @@ namespace GaussianSplatting
 
             for (int iteration = 0; iteration < ComputedLodKMeansIterations; iteration++)
             {
-                EditorUtility.DisplayProgressBar("Import Gaussian Splat LOD",
-                    $"{progressLabel}, k-means iteration {iteration + 1:N0}/{ComputedLodKMeansIterations:N0}, {maxClusterCount:N0} max clusters",
+                EditorUtility.DisplayProgressBar(GSEditorText.T("Import Gaussian Splat LOD", "Gaussian Splat LOD をインポート", "导入 Gaussian Splat LOD"),
+                    GSEditorText.T($"{progressLabel}, k-means iteration {iteration + 1:N0}/{ComputedLodKMeansIterations:N0}, {maxClusterCount:N0} max clusters", $"{progressLabel}、k-means 反復 {iteration + 1:N0}/{ComputedLodKMeansIterations:N0}、最大 {maxClusterCount:N0} クラスター", $"{progressLabel}，k-means 迭代 {iteration + 1:N0}/{ComputedLodKMeansIterations:N0}，最多 {maxClusterCount:N0} 个聚类"),
                     progressStart + progressSpan * ((iteration + 0.5f) / (ComputedLodKMeansIterations + 1.0f)));
                 Dispatch1D(shader, clearKernel, clusterSlotCount);
                 shader.Dispatch(assignKernel, Mathf.Max(1, Mathf.CeilToInt(maxSourceCount / 256.0f)), batchChunkCount, 1);
                 Dispatch1D(shader, normalizeKernel, clusterSlotCount);
             }
 
-            EditorUtility.DisplayProgressBar("Import Gaussian Splat LOD",
-                $"{progressLabel}, merging",
+            EditorUtility.DisplayProgressBar(GSEditorText.T("Import Gaussian Splat LOD", "Gaussian Splat LOD をインポート", "导入 Gaussian Splat LOD"),
+                GSEditorText.T($"{progressLabel}, merging", $"{progressLabel}、統合中", $"{progressLabel}，正在合并"),
                 progressStart + progressSpan * (ComputedLodKMeansIterations / (ComputedLodKMeansIterations + 1.0f)));
             shader.Dispatch(mergeKernel, maxClusterCount, batchChunkCount, 1);
         }
@@ -512,14 +512,14 @@ namespace GaussianSplatting
                 }
                 float levelProgressStart = batchProgressStart + batchProgressSpan * (lodLevelOrdinal / (float)Mathf.Max(1, lodLevelCount));
                 float levelProgressSpan = batchProgressSpan / Mathf.Max(1, lodLevelCount);
-                EditorUtility.DisplayProgressBar("Import Gaussian Splat LOD",
-                    $"Computing LOD splats chunks {firstChunk + 1:N0}-{lastChunk + 1:N0}/{totalChunkCount:N0}, LOD {lodLevelOrdinal + 1:N0}/{lodLevelCount:N0}, {maxClusterCount:N0} max clusters",
+                EditorUtility.DisplayProgressBar(GSEditorText.T("Import Gaussian Splat LOD", "Gaussian Splat LOD をインポート", "导入 Gaussian Splat LOD"),
+                    GSEditorText.T($"Computing LOD splats chunks {firstChunk + 1:N0}-{lastChunk + 1:N0}/{totalChunkCount:N0}, LOD {lodLevelOrdinal + 1:N0}/{lodLevelCount:N0}, {maxClusterCount:N0} max clusters", $"チャンク {firstChunk + 1:N0}-{lastChunk + 1:N0}/{totalChunkCount:N0} の LOD Splat を計算中、LOD {lodLevelOrdinal + 1:N0}/{lodLevelCount:N0}、最大 {maxClusterCount:N0} クラスター", $"正在计算分块 {firstChunk + 1:N0}-{lastChunk + 1:N0}/{totalChunkCount:N0} 的 LOD Splat，LOD {lodLevelOrdinal + 1:N0}/{lodLevelCount:N0}，最多 {maxClusterCount:N0} 个聚类"),
                     levelProgressStart);
 
                 int clusterSlotCount = batchChunkCount * maxClusterCount;
                 RunKMeansMergeGpu(shader, clearKernel, normKernel, initKernel, assignKernel, normalizeKernel, mergeKernel,
                     batchChunkCount, maxClusterCount, maxLowerCount, level, reusePercent, 0, 0, 0,
-                    $"LOD chunks {firstChunk + 1:N0}-{lastChunk + 1:N0}/{totalChunkCount:N0}, level {lodLevelOrdinal + 1:N0}/{lodLevelCount:N0}",
+                    GSEditorText.T($"LOD chunks {firstChunk + 1:N0}-{lastChunk + 1:N0}/{totalChunkCount:N0}, level {lodLevelOrdinal + 1:N0}/{lodLevelCount:N0}", $"LOD チャンク {firstChunk + 1:N0}-{lastChunk + 1:N0}/{totalChunkCount:N0}、レベル {lodLevelOrdinal + 1:N0}/{lodLevelCount:N0}", $"LOD 分块 {firstChunk + 1:N0}-{lastChunk + 1:N0}/{totalChunkCount:N0}，级别 {lodLevelOrdinal + 1:N0}/{lodLevelCount:N0}"),
                     levelProgressStart, levelProgressSpan);
                 mergedBuffer.GetData(mergedData, 0, 0, clusterSlotCount);
                 if (shCoeffCount > 0) mergedSHBuffer.GetData(mergedSHData, 0, 0, (int)Mathf.Min(mergedSHData.Length, (long)clusterSlotCount * shPer));

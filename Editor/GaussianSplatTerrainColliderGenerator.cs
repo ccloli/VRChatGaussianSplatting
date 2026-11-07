@@ -21,7 +21,7 @@ namespace GaussianSplatting.Editor
         static void Open()
         {
             ColliderWindow window = EditorWindow.GetWindow<ColliderWindow>();
-            window.titleContent = new GUIContent("Terrain Collider");
+            window.titleContent = GSEditorText.C("Terrain Collider", "地形コライダー", "地形碰撞体");
             window.TryUseSelection();
             window.Show();
         }
@@ -30,7 +30,7 @@ namespace GaussianSplatting.Editor
         static void OpenForContext(MenuCommand command)
         {
             ColliderWindow window = EditorWindow.GetWindow<ColliderWindow>();
-            window.titleContent = new GUIContent("Terrain Collider");
+            window.titleContent = GSEditorText.C("Terrain Collider", "地形コライダー", "地形碰撞体");
             window.SetTarget(command.context as GaussianSplatObject);
             window.Show();
         }
@@ -93,45 +93,45 @@ namespace GaussianSplatting.Editor
 
             void OnGUI()
             {
-                EditorGUILayout.LabelField("Splat Heightmap Collider", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField(GSEditorText.T("Splat Heightmap Collider", "Splat 高さマップコライダー", "Splat 高度图碰撞体"), EditorStyles.boldLabel);
                 EditorGUI.BeginChangeCheck();
-                GaussianSplatObject newTarget = (GaussianSplatObject)EditorGUILayout.ObjectField("Source splat", _target, typeof(GaussianSplatObject), true);
+                GaussianSplatObject newTarget = (GaussianSplatObject)EditorGUILayout.ObjectField(GSEditorText.T("Source splat", "ソース Splat", "源 Splat"), _target, typeof(GaussianSplatObject), true);
                 if (EditorGUI.EndChangeCheck())
                 {
                     _target = newTarget;
                     if (_target != null) SeedBoxFromTarget();
                 }
-                if (GUILayout.Button("Use selected splat")) TryUseSelection();
+                if (GUILayout.Button(GSEditorText.T("Use selected splat", "選択中の Splat を使用", "使用选中的 Splat"))) TryUseSelection();
 
                 EditorGUILayout.Space();
-                EditorGUILayout.LabelField("Region (oriented box)", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField(GSEditorText.T("Region (oriented box)", "領域（回転可能なボックス）", "区域（定向包围盒）"), EditorStyles.boldLabel);
                 EditorGUI.BeginChangeCheck();
-                _boxCenter = EditorGUILayout.Vector3Field("Center", _boxCenter);
-                _boxEuler = EditorGUILayout.Vector3Field("Rotation", _boxEuler);
-                _boxSize = EditorGUILayout.Vector3Field("Size", _boxSize);
+                _boxCenter = EditorGUILayout.Vector3Field(GSEditorText.T("Center", "中心", "中心"), _boxCenter);
+                _boxEuler = EditorGUILayout.Vector3Field(GSEditorText.T("Rotation", "回転", "旋转"), _boxEuler);
+                _boxSize = EditorGUILayout.Vector3Field(GSEditorText.T("Size", "サイズ", "大小"), _boxSize);
                 _boxSize = Vector3.Max(_boxSize, new Vector3(MinBoxSize, MinBoxSize, MinBoxSize));
-                _showSceneHandle = EditorGUILayout.Toggle("Show scene handle", _showSceneHandle);
+                _showSceneHandle = EditorGUILayout.Toggle(GSEditorText.T("Show scene handle", "シーンハンドルを表示", "显示场景手柄"), _showSceneHandle);
                 if (EditorGUI.EndChangeCheck()) MarkRegionChanged();
 
                 EditorGUILayout.Space();
-                EditorGUILayout.LabelField("Bake", EditorStyles.boldLabel);
-                _outputResolution = Mathf.Clamp(EditorGUILayout.IntField("Output resolution", _outputResolution), 8, 4096);
-                _supersample = Mathf.Clamp(EditorGUILayout.IntField("Supersample", _supersample), 1, 8);
-                _opacityMultiplier = Mathf.Clamp(EditorGUILayout.FloatField("Opacity multiplier", _opacityMultiplier), 0.001f, 1000.0f);
-                _alphaCullThreshold = EditorGUILayout.Slider("Cull splats below alpha", _alphaCullThreshold, 0.0f, 1.0f);
-                _reductionPercentile = EditorGUILayout.Slider("Reduction percentile", _reductionPercentile, 0.0f, 1.0f);
-                _medianFilterRadius = Mathf.Clamp(EditorGUILayout.IntField("Median filter radius", _medianFilterRadius), 0, 8);
-                _holeFillRadius = Mathf.Clamp(EditorGUILayout.IntField("Hole fill radius", _holeFillRadius), 0, 32);
+                EditorGUILayout.LabelField(GSEditorText.T("Bake", "ベイク", "烘焙"), EditorStyles.boldLabel);
+                _outputResolution = Mathf.Clamp(EditorGUILayout.IntField(GSEditorText.T("Output resolution", "出力解像度", "输出分辨率"), _outputResolution), 8, 4096);
+                _supersample = Mathf.Clamp(EditorGUILayout.IntField(GSEditorText.T("Supersample", "スーパーサンプリング", "超采样"), _supersample), 1, 8);
+                _opacityMultiplier = Mathf.Clamp(EditorGUILayout.FloatField(GSEditorText.T("Opacity multiplier", "不透明度倍率", "不透明度倍率"), _opacityMultiplier), 0.001f, 1000.0f);
+                _alphaCullThreshold = EditorGUILayout.Slider(GSEditorText.T("Cull splats below alpha", "Alpha がこの値未満の Splat を除外", "剔除 Alpha 低于此值的 Splat"), _alphaCullThreshold, 0.0f, 1.0f);
+                _reductionPercentile = EditorGUILayout.Slider(GSEditorText.T("Reduction percentile", "縮約パーセンタイル", "归约百分位数"), _reductionPercentile, 0.0f, 1.0f);
+                _medianFilterRadius = Mathf.Clamp(EditorGUILayout.IntField(GSEditorText.T("Median filter radius", "メディアンフィルター半径", "中值滤波半径"), _medianFilterRadius), 0, 8);
+                _holeFillRadius = Mathf.Clamp(EditorGUILayout.IntField(GSEditorText.T("Hole fill radius", "穴埋め半径", "孔洞填充半径"), _holeFillRadius), 0, 32);
 
                 EditorGUILayout.Space();
                 using (new EditorGUI.DisabledScope(_target == null))
                 {
-                    if (GUILayout.Button("Bake Collision Mesh", GUILayout.Height(30f)))
+                    if (GUILayout.Button(GSEditorText.T("Bake Collision Mesh", "衝突メッシュをベイク", "烘焙碰撞网格"), GUILayout.Height(30f)))
                     {
                         Generate(this);
                     }
                 }
-                if (_target == null) EditorGUILayout.HelpBox("Assign a source GaussianSplatObject.", MessageType.Info);
+                if (_target == null) EditorGUILayout.HelpBox(GSEditorText.T("Assign a source GaussianSplatObject.", "ソース GaussianSplatObject を指定してください。", "请指定源 GaussianSplatObject。"), MessageType.Info);
             }
 
             void OnSceneGui(SceneView view)
@@ -361,11 +361,11 @@ namespace GaussianSplatting.Editor
 
                 // Raster+blend every LOD0 source splat inside the box, CPU-sorted front-to-back, directly from
                 // the original packed textures (no fused set, no GPU sort, no chunk cap).
-                EditorUtility.DisplayProgressBar("Splat Heightmap Collider", "Rasterizing source splats", 0.35f);
+                EditorUtility.DisplayProgressBar(GSEditorText.T("Splat Heightmap Collider", "Splat 高さマップコライダー", "Splat 高度图碰撞体"), GSEditorText.T("Rasterizing source splats", "ソース Splat をラスタライズ中", "正在光栅化源 Splat"), 0.35f);
                 ColliderSourceBake.RasterSourceIntoAccum(target, boxToWorld, size, opacityMultiplier, alphaCullThreshold,
                     accum, out _, out _);
 
-                EditorUtility.DisplayProgressBar("Splat Heightmap Collider", "Resolving heightmap", 0.82f);
+                EditorUtility.DisplayProgressBar(GSEditorText.T("Splat Heightmap Collider", "Splat 高さマップコライダー", "Splat 高度图碰撞体"), GSEditorText.T("Resolving heightmap", "高さマップを解決中", "正在解析高度图"), 0.82f);
                 resolveMaterial = new Material(resolveShader) { hideFlags = HideFlags.HideAndDontSave };
                 resolveMaterial.SetTexture("_DepthTex", accum);
                 resolveMaterial.SetInt("_OutputResolution", res);
@@ -378,7 +378,7 @@ namespace GaussianSplatting.Editor
                 RenderTexture finalHeights = reduced;
                 if (medianFilterRadius > 0)
                 {
-                    EditorUtility.DisplayProgressBar("Splat Heightmap Collider", "Median filtering heightmap", 0.9f);
+                    EditorUtility.DisplayProgressBar(GSEditorText.T("Splat Heightmap Collider", "Splat 高さマップコライダー", "Splat 高度图碰撞体"), GSEditorText.T("Median filtering heightmap", "高さマップにメディアンフィルターを適用中", "正在对高度图进行中值滤波"), 0.9f);
                     resolveMaterial.SetTexture("_InputHeightTex", reduced);
                     resolveMaterial.SetInt("_MedianRadius", medianFilterRadius);
                     Graphics.Blit(null, filtered, resolveMaterial, 1);

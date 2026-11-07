@@ -34,7 +34,7 @@ Gaussian splatting for VRChat worlds: runtime camera-sorted rendering through Ud
 - Automatic, editor-only Scene-view sorting for every `GaussianSplatObject`
 - Editor tools: **terrain collider** generation, and **re-import** (exact / edit-settings) from a splat's stored import metadata
 - Android build conversion to no-geometry, fake-sRGB splat shaders
-- Bilingual UI (English / 日本語)
+- UI in English / 日本語 / 简体中文; editor tools follow the Unity editor language
 - VRC Light Volumes integration
 
 ## Quick Start
@@ -110,7 +110,8 @@ The renderer creates a world-space control canvas automatically when splats are 
 - Alpha Cutoff (lower = better quality, higher cost) + Alpha Cull
 - Antialiasing
 - Camera Quantization
-- Language (English / 日本語)
+- Language (English / 日本語 / 简体中文)
+- Panel additional descriptions can be entered separately for each language in the UI component inspector. Existing generated panels are upgraded in place. Both TMP fonts use dynamic, multi-atlas population; panel text and gallery names/descriptions are also added to the font assets in the editor. Characters first encountered in a running world are added to its in-memory atlas when the source font contains them. The Chinese font tag uses the default TextMesh Pro font resource path (`Fonts & Materials/`); if that path is customized, place the SC TMP font asset under the configured Resources path.
 - An **Advanced Settings** toggle reveals the finer sliders
 - LOD Splat Cap (shown only when LOD splats are present)
 
@@ -256,7 +257,7 @@ VRChat ワールド向けのガウシアンスプラッティング：Udon に�
 - すべての `GaussianSplatObject` に対するエディタ限定の Scene ビュー自動ソート
 - エディタツール：**地形コライダー** 生成、保存済みインポートメタデータからの **再インポート**（そのまま／設定編集）
 - Android ビルドではジオメトリなし・疑似 sRGB スプラットシェーダーへ変換
-- バイリンガル UI（英語 / 日本語）
+- 多言語 UI（英語 / 日本語 / 簡体字中国語）、エディタツールは Unity エディタの言語に対応
 - VRC Light Volumes 連携
 
 ## クイックスタート
@@ -332,7 +333,8 @@ VRChat ワールド（Udon）でスプラットをランタイムにカメラソ
 - アルファカットオフ（低いほど高品質・高コスト）＋アルファカル
 - アンチエイリアス
 - カメラ量子化
-- 言語（英語 / 日本語）
+- 言語（英語 / 日本語 / 簡体字中国語）
+- UI コンポーネントのインスペクターで各言語の追加説明を入力可能。既存の自動生成パネルもそのまま更新される。両方の TMP フォントは動的・マルチアトラスで、パネルやギャラリーのテキストもエディタでフォントに追加される。実行中に初めて現れた文字は、元のフォントに存在すればメモリ上のアトラスに追加される。中国語フォントタグは TextMesh Pro 標準のリソースパス（`Fonts & Materials/`）を使用する。変更した場合は SC TMP フォントアセットを設定済みの Resources パスへ配置する。
 - **詳細設定** トグルで細かいスライダーを表示
 - LOD Splat Cap（LOD スプラットが存在するときのみ表示）
 

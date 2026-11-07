@@ -30,7 +30,7 @@ namespace GaussianSplatting.Editor
         [MenuItem("Gaussian Splatting/Export Package...", false, 900)]
         static void ExportPackage()
         {
-            string targetPath = EditorUtility.SaveFilePanel("Export Package", "", "VRChatGaussianSplatting.unitypackage", "unitypackage");
+            string targetPath = EditorUtility.SaveFilePanel(GSEditorText.T("Export Package", "パッケージをエクスポート", "导出工具包"), "", "VRChatGaussianSplatting.unitypackage", "unitypackage");
             if (string.IsNullOrEmpty(targetPath))
             {
                 return;
@@ -51,12 +51,12 @@ namespace GaussianSplatting.Editor
                 Directory.CreateDirectory(Path.GetDirectoryName(targetPath) ?? ".");
                 AssetDatabase.ExportPackage(assets, targetPath, ExportPackageOptions.Default);
                 UnityEngine.Debug.Log($"[GaussianSplatting] Exported package with {assets.Length} assets: {targetPath}");
-                EditorUtility.DisplayDialog("Package Export Complete", "Exported package:\n" + targetPath, "OK");
+                EditorUtility.DisplayDialog(GSEditorText.T("Package Export Complete", "パッケージのエクスポートが完了しました", "工具包导出完成"), GSEditorText.T("Exported package:\n", "エクスポート先:\n", "工具包已导出至：\n") + targetPath, "OK");
             }
             catch (Exception ex)
             {
                 UnityEngine.Debug.LogException(ex);
-                EditorUtility.DisplayDialog("Package Export Failed", ex.Message, "OK");
+                EditorUtility.DisplayDialog(GSEditorText.T("Package Export Failed", "パッケージのエクスポートに失敗しました", "工具包导出失败"), ex.Message, "OK");
             }
         }
 

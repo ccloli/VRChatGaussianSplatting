@@ -308,7 +308,7 @@ namespace GaussianSplatting
 
             void SaveCurrent()
             {
-                EditorUtility.DisplayProgressBar("Import Gaussian Splat LOD", $"Saving texture set {_setIndex + 1}", 0.84f);
+                EditorUtility.DisplayProgressBar(GSEditorText.T("Import Gaussian Splat LOD", "Gaussian Splat LOD をインポート", "导入 Gaussian Splat LOD"), GSEditorText.T($"Saving texture set {_setIndex + 1}", $"テクスチャセット {_setIndex + 1} を保存中", $"正在保存纹理组 {_setIndex + 1}"), 0.84f);
                 _set.Save();
                 Positions.Add(_set.PositionTexture);
                 Colors.Add(_set.ColorTexture);
@@ -435,7 +435,7 @@ namespace GaussianSplatting
             Directory.CreateDirectory(tempFolder);
             try
             {
-                EditorUtility.DisplayProgressBar("Import Gaussian Splat LOD", "Scanning bounds", StreamedImportProgressStart);
+                EditorUtility.DisplayProgressBar(GSEditorText.T("Import Gaussian Splat LOD", "Gaussian Splat LOD をインポート", "导入 Gaussian Splat LOD"), GSEditorText.T("Scanning bounds", "境界をスキャン中", "正在扫描边界"), StreamedImportProgressStart);
                 var _sw = System.Diagnostics.Stopwatch.StartNew();
                 long _tBounds = 0, _tNormalize = 0, _tBucketing = 0, _tBuild = 0, _tWrite = 0, _tFinish = 0, _tPrefab = 0, _m;
                 string resolvedPlyPath = GaussianSplatImporter.ResolveSourceToPlyPath(sourcePath, tempFolder);
@@ -450,7 +450,7 @@ namespace GaussianSplatting
                 float normalizeScale = 1.0f;
                 if (options.normalizeSize)
                 {
-                    EditorUtility.DisplayProgressBar("Import Gaussian Splat LOD", "Measuring normalize extent", 0.025f);
+                    EditorUtility.DisplayProgressBar(GSEditorText.T("Import Gaussian Splat LOD", "Gaussian Splat LOD をインポート", "导入 Gaussian Splat LOD"), GSEditorText.T("Measuring normalize extent", "正規化範囲を測定中", "正在测量归一化范围"), 0.025f);
                     _m = _sw.ElapsedMilliseconds;
                     normalizeScale = ComputeNormalizeScale(resolvedPlyPath, layout, options, centroid, bounds, splatCount);
                     bounds.SetMinMax((bounds.min - centroid) * normalizeScale + centroid, (bounds.max - centroid) * normalizeScale + centroid);
@@ -488,7 +488,7 @@ namespace GaussianSplatting
                 int bucketCount = 1 << bucketBits;
                 string[] bucketPaths = new string[bucketCount];
                 long[] bucketCounts = new long[bucketCount];
-                EditorUtility.DisplayProgressBar("Import Gaussian Splat LOD", $"Partitioning {bucketCount} Hilbert buckets", 0.1f);
+                EditorUtility.DisplayProgressBar(GSEditorText.T("Import Gaussian Splat LOD", "Gaussian Splat LOD をインポート", "导入 Gaussian Splat LOD"), GSEditorText.T($"Partitioning {bucketCount} Hilbert buckets", $"{bucketCount} 個の Hilbert バケットに分割中", $"正在划分为 {bucketCount} 个 Hilbert 桶"), 0.1f);
                 _m = _sw.ElapsedMilliseconds;
                 WriteHilbertBuckets(resolvedPlyPath, layout, bounds, options, tempFolder, bucketBits, bucketPaths, bucketCounts, shCoeffCount, shStore, centroid, normalizeScale);
                 _tBucketing = _sw.ElapsedMilliseconds - _m;
@@ -521,7 +521,7 @@ namespace GaussianSplatting
                 Vector3 boundsSize = bounds.size;
                 float maxExtent = Mathf.Max(boundsSize.x, Mathf.Max(boundsSize.y, boundsSize.z));
                 float invUniform = maxExtent > 1e-12f ? 1.0f / maxExtent : 0.0f;
-                EditorUtility.DisplayProgressBar("Import Gaussian Splat LOD", $"Building variable chunks (cap {cap:N0})", 0.22f);
+                EditorUtility.DisplayProgressBar(GSEditorText.T("Import Gaussian Splat LOD", "Gaussian Splat LOD をインポート", "导入 Gaussian Splat LOD"), GSEditorText.T($"Building variable chunks (cap {cap:N0})", $"可変チャンクを構築中（上限 {cap:N0}）", $"正在构建可变分块（上限 {cap:N0}）"), 0.22f);
 
                 void ConsumeSortedBucketRecords(BucketRecord[] records, int recordCount)
                 {
@@ -575,8 +575,8 @@ namespace GaussianSplatting
                         continue;
                     }
 
-                    EditorUtility.DisplayProgressBar("Import Gaussian Splat LOD",
-                        $"Chunking Hilbert bucket {bucket + 1:N0}/{bucketCount:N0} ({bucketCounts[bucket]:N0} splats, {writer.Chunks.Count:N0} chunks)",
+                    EditorUtility.DisplayProgressBar(GSEditorText.T("Import Gaussian Splat LOD", "Gaussian Splat LOD をインポート", "导入 Gaussian Splat LOD"),
+                        GSEditorText.T($"Chunking Hilbert bucket {bucket + 1:N0}/{bucketCount:N0} ({bucketCounts[bucket]:N0} splats, {writer.Chunks.Count:N0} chunks)", $"Hilbert バケット {bucket + 1:N0}/{bucketCount:N0} を分割中（{bucketCounts[bucket]:N0} Splat、{writer.Chunks.Count:N0} チャンク）", $"正在分块 Hilbert 桶 {bucket + 1:N0}/{bucketCount:N0}（{bucketCounts[bucket]:N0} 个 Splat，{writer.Chunks.Count:N0} 个分块）"),
                         0.25f + 0.55f * (bucket / (float)bucketCount));
                     ProcessSortedBucketFile(bucketPaths[bucket], bucketCounts[bucket], bucketBits, tempFolder, keyComparer, ConsumeSortedBucketRecords, bucket + 1, bucketCount);
                 }
@@ -606,7 +606,7 @@ namespace GaussianSplatting
                     throw new InvalidDataException("Streamed LOD import produced no chunks.");
                 }
 
-                EditorUtility.DisplayProgressBar("Import Gaussian Splat LOD", "Writing chunk metadata", 0.92f);
+                EditorUtility.DisplayProgressBar(GSEditorText.T("Import Gaussian Splat LOD", "Gaussian Splat LOD をインポート", "导入 Gaussian Splat LOD"), GSEditorText.T("Writing chunk metadata", "チャンクメタデータを書き込み中", "正在写入分块元数据"), 0.92f);
                 _m = _sw.ElapsedMilliseconds;
                 CreateChunkMetadata(dataFolder, assetName, chunks, out Texture2D chunkMin, out Texture2D chunkMax, out Texture2D chunkRange, out Vector4 chunkLayout);
                 string metadataJson = GaussianSplatImporter.ImportMetadata.ToJson(new GaussianSplatImporter.ImportMetadata

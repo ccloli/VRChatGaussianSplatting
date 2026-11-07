@@ -19,6 +19,7 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
 {
     const int LanguageEnglish = 0;
     const int LanguageJapanese = 1;
+    const int LanguageChineseSimplified = 2;
     const float MinAlphaCutoff = 0.005f;
     const float MinPositiveLodSplatCap = 10000.0f;
     const int SliderShBand = 0;
@@ -45,6 +46,7 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
     const float SliderChangeThreshold = 0.0001f;
     public const string DefaultSubtitleEnglish = "Developed by misha_m";
     public const string DefaultSubtitleJapanese = "開発: misha_m";
+    public const string DefaultSubtitleChinese = "开发：misha_m";
     public const float SubtitleFontSize = 10.0f;
     public const float SubtitlePreferredHeight = 15.0f;
     public const float CustomSubtitlePreferredHeight = 28.0f;
@@ -53,6 +55,7 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
     [Header("Custom Subtitle")]
     [TextArea(1, 3)] public string customSubtitleEnglish;
     [TextArea(1, 3)] public string customSubtitleJapanese;
+    [TextArea(1, 3)] public string customSubtitleChinese;
     [Header("UI References")]
     public TextMeshProUGUI subtitleText, customSubtitleText;
     public TextMeshProUGUI currentSplatText, sortingSectionText, cameraQuantizationLabelText, cameraQuantizationText;
@@ -61,7 +64,7 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
     public TextMeshProUGUI alphaCullLabelText, alphaCullText;
     public TextMeshProUGUI lodCullLabelText, lodCullText, qualitySectionText;
     public TextMeshProUGUI languageSectionText;
-    public Button vrcLightVolumesButton, englishLanguageButton, japaneseLanguageButton;
+    public Button vrcLightVolumesButton, englishLanguageButton, japaneseLanguageButton, chineseLanguageButton;
     public Button qualityVeryLowButton, qualityLowButton, qualityMediumButton, qualityHighButton, advancedSettingsButton;
     public Slider shBandSlider, antiAliasingSlider, lightVolumeIntensitySlider, alphaCutoffSlider;
     public Slider alphaCullSlider, lodCullSlider;
@@ -84,6 +87,8 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
     string _galleryMasterName = "";                 // cached so RefreshUI doesn't scan players every frame
 
     [Header("Social Links")]
+    public TextMeshProUGUI socialTitleText;
+    public Button socialCloseButton;
     public GameObject socialPanel;                  // QR + URL container, toggled by the icon buttons
     public UnityEngine.UI.Image socialQrImage;      // shows the selected link's QR code
     public TMPro.TMP_InputField socialUrlField;     // read-only, selectable/copyable URL
@@ -830,16 +835,36 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
 #endif
     }
 
-    string Localize(string english, string japanese) { return selectedLanguage == LanguageJapanese ? japanese : english; }
-        string FormatFloat(float value) { return (Mathf.Round(value * 10000.0f) * 0.0001f).ToString("0.####"); }
-    string ToggleLabel(bool enabled) { return Localize(enabled ? "On" : "Off", enabled ? "オン" : "オフ"); }
-    string AdvancedSettingsLabel() { return Localize(showAdvancedSettings ? "Hide Advanced Settings" : "Show Advanced Settings", showAdvancedSettings ? "詳細設定を隠す" : "詳細設定を表示"); }
-    string RenderedSplatCountLabel(int count) { return Localize("Rendered Splats: ", "描画スプラット数: ") + count; }
+    string Localize(string english, string japanese, string chinese)
+    {
+        return selectedLanguage == LanguageJapanese ? japanese : selectedLanguage == LanguageChineseSimplified ? chinese : english;
+    }
+    string FormatFloat(float value) { return (Mathf.Round(value * 10000.0f) * 0.0001f).ToString("0.####"); }
+    string ToggleLabel(bool enabled) { return Localize(enabled ? "On" : "Off", enabled ? "オン" : "オフ", enabled ? "开启" : "关闭"); }
+    string AdvancedSettingsLabel() { return Localize(showAdvancedSettings ? "Hide Advanced Settings" : "Show Advanced Settings", showAdvancedSettings ? "詳細設定を隠す" : "詳細設定を表示", showAdvancedSettings ? "隐藏高级设置" : "显示高级设置"); }
+    string RenderedSplatCountLabel(int count) { return Localize("Rendered Splats: ", "描画スプラット数: ", "已渲染 Splat 数：") + count; }
     bool SliderCanWriteBack(int sliderKind, bool allowWriteBack) { return allowWriteBack; }
     bool ShouldShowLODControls() { return gaussianSplatRenderer != null && gaussianSplatRenderer.HasActiveLODObjects(); }
 
-    void SetText(TextMeshProUGUI text, string value) { if (text != null && text.text != value) text.text = value; }
-    void SetLocalizedText(TextMeshProUGUI text, string english, string japanese) { SetText(text, Localize(english, japanese)); }
+    // TMP_Text.font is not exposed to Udon. The Chinese font tag selects the SC asset;
+    // without it the panel keeps its Japanese base font and its fallback chain.
+    void SetText(TextMeshProUGUI text, string value)
+    {
+        if (text == null) return;
+        if (value == null) value = "";
+        if (selectedLanguage != LanguageChineseSimplified || value.Length == 0)
+        {
+            if (text.text != value) text.text = value;
+            return;
+        }
+        const string prefix = "<font=\"NotoSansSC-VF SDF\">";
+        const string suffix = "</font>";
+        string current = text.text;
+        if (current != null && current.Length == prefix.Length + value.Length + suffix.Length &&
+            current.StartsWith(prefix) && current.EndsWith(suffix) && current.IndexOf(value, prefix.Length) == prefix.Length) return;
+        text.text = prefix + value + suffix;
+    }
+    void SetLocalizedText(TextMeshProUGUI text, string english, string japanese, string chinese) { SetText(text, Localize(english, japanese, chinese)); }
     void SetActive(Component component, bool active) { if (component != null && component.gameObject.activeSelf != active) component.gameObject.SetActive(active); }
     void SetParentActive(Component component, bool active)
     {
@@ -977,25 +1002,27 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
 
     void RefreshLocalizedLabels()
     {
-        SetText(ResolveSubtitleText(), Localize(DefaultSubtitleEnglish, DefaultSubtitleJapanese));
+        SetText(ResolveSubtitleText(), Localize(DefaultSubtitleEnglish, DefaultSubtitleJapanese, DefaultSubtitleChinese));
         TextMeshProUGUI customSubtitle = ResolveCustomSubtitleText();
-        string customSubtitleValue = Localize(customSubtitleEnglish, customSubtitleJapanese);
+        string customSubtitleValue = Localize(customSubtitleEnglish, customSubtitleJapanese, customSubtitleChinese);
         SetText(customSubtitle, customSubtitleValue);
         SetActive(customSubtitle, !string.IsNullOrEmpty(customSubtitleValue));
-        SetLocalizedText(sortingSectionText, "Sorting Settings", "ソート設定");
-        SetLocalizedText(cameraQuantizationLabelText, "Camera move amount to trigger resort", "再ソートするカメラ移動量");
-        SetLocalizedText(materialSectionText, "Material Settings", "マテリアル設定");
-        SetLocalizedText(shBandLabelText, "SH Band", "SH バンド");
-        SetLocalizedText(vrcLightVolumesLabelText, "VRC Light Volumes", "VRC Light Volumes");
-        SetLocalizedText(lightVolumeIntensityLabelText, "Light Volume Intensity", "ライトボリューム強度");
-        SetLocalizedText(antiAliasingLabelText, "Antialiasing", "アンチエイリアス");
-        SetLocalizedText(gaussianScaleLabelText, "Gaussian Scale", "ガウススケール");
-        SetLocalizedText(alphaCutoffLabelText, "Alpha Cutoff\n(lower = better quality)", "アルファカットオフ\n(低いほど高品質)");
-        SetLocalizedText(alphaCullLabelText, "Alpha Cull\n(higher = fewer splats)", "アルファカリング\n(高いほどスプラット減少)");
-        SetLocalizedText(lodCullLabelText, "LOD Splat Cap", "LOD スプラット上限");
-        SetLocalizedText(qualitySectionText, "Quality", "品質");
-        SetLocalizedText(languageSectionText, "Language", "言語");
-        SetLocalizedText(ResolveGalleryHeaderText(), "Gallery (global)", "ギャラリー (全体)");
+        SetLocalizedText(sortingSectionText, "Sorting Settings", "ソート設定", "排序设置");
+        SetLocalizedText(cameraQuantizationLabelText, "Camera move amount to trigger resort", "再ソートするカメラ移動量", "触发重新排序的相机移动距离");
+        SetLocalizedText(materialSectionText, "Material Settings", "マテリアル設定", "材质设置");
+        SetLocalizedText(shBandLabelText, "SH Band", "SH バンド", "SH 阶数");
+        SetLocalizedText(vrcLightVolumesLabelText, "VRC Light Volumes", "VRC Light Volumes", "VRC Light Volumes");
+        SetLocalizedText(lightVolumeIntensityLabelText, "Light Volume Intensity", "ライトボリューム強度", "光照体积强度");
+        SetLocalizedText(antiAliasingLabelText, "Antialiasing", "アンチエイリアス", "抗锯齿");
+        SetLocalizedText(gaussianScaleLabelText, "Gaussian Scale", "ガウススケール", "高斯缩放");
+        SetLocalizedText(alphaCutoffLabelText, "Alpha Cutoff\n(lower = better quality)", "アルファカットオフ\n(低いほど高品質)", "Alpha 截断阈值\n（越低画质越高）");
+        SetLocalizedText(alphaCullLabelText, "Alpha Cull\n(higher = fewer splats)", "アルファカリング\n(高いほどスプラット減少)", "Alpha 剔除阈值\n（越高 Splat 越少）");
+        SetLocalizedText(lodCullLabelText, "LOD Splat Cap", "LOD スプラット上限", "LOD Splat 数量上限");
+        SetLocalizedText(qualitySectionText, "Quality", "品質", "画质");
+        SetLocalizedText(languageSectionText, "Language", "言語", "语言");
+        SetLocalizedText(ResolveGalleryHeaderText(), "Gallery (global)", "ギャラリー (全体)", "画廊（全局）");
+        SetLocalizedText(socialTitleText, "Scan or copy the link", "リンクをスキャンまたはコピー", "扫描或复制链接");
+        if (socialCloseButton != null) ApplyButtonVisual(socialCloseButton, Localize("Close", "閉じる", "关闭"), _toggleDisabledColor);
         RefreshLanguageButtons();
     }
 
@@ -1003,6 +1030,7 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
     {
         if (englishLanguageButton != null) { SetInteractable(englishLanguageButton, true); ApplyButtonVisual(englishLanguageButton, "English", selectedLanguage == LanguageEnglish ? _selectedSplatColor : _defaultSplatColor); }
         if (japaneseLanguageButton != null) { SetInteractable(japaneseLanguageButton, true); ApplyButtonVisual(japaneseLanguageButton, "日本語", selectedLanguage == LanguageJapanese ? _selectedSplatColor : _defaultSplatColor); }
+        if (chineseLanguageButton != null) { SetInteractable(chineseLanguageButton, true); ApplyButtonVisual(chineseLanguageButton, "简体中文", selectedLanguage == LanguageChineseSimplified ? _selectedSplatColor : _defaultSplatColor); }
     }
 
     bool AdvancedSettingsVisible() { return showAdvancedSettings || advancedSettingsButton == null; }
@@ -1184,10 +1212,10 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
     void RefreshQualityButtons()
     {
         int activePreset = gaussianSplatRenderer != null ? gaussianSplatRenderer.GetQualityPresetIndex() : -1;
-        SetQualityButton(qualityVeryLowButton, 0, activePreset, Localize("Very Low", "最低"));
-        SetQualityButton(qualityLowButton, 1, activePreset, Localize("Low", "低"));
-        SetQualityButton(qualityMediumButton, 2, activePreset, Localize("Medium", "中"));
-        SetQualityButton(qualityHighButton, 3, activePreset, Localize("High", "高"));
+        SetQualityButton(qualityVeryLowButton, 0, activePreset, Localize("Very Low", "最低", "极低"));
+        SetQualityButton(qualityLowButton, 1, activePreset, Localize("Low", "低", "低"));
+        SetQualityButton(qualityMediumButton, 2, activePreset, Localize("Medium", "中", "中"));
+        SetQualityButton(qualityHighButton, 3, activePreset, Localize("High", "高", "高"));
     }
 
     void SetQualityButton(Button button, int presetIndex, int activePreset, string label)
@@ -1360,7 +1388,7 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
         if (sliderKind == SliderLODSplatCap)
         {
             int cap = Mathf.RoundToInt(currentValue);
-            return cap <= 0 ? Localize("No cap", "上限なし") : cap.ToString();
+            return cap <= 0 ? Localize("No cap", "上限なし", "无上限") : cap.ToString();
         }
         return FormatFloat(currentValue);
     }
@@ -1508,8 +1536,8 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
         bool isMaster = Networking.LocalPlayer != null && Networking.LocalPlayer.isMaster;
         SetInteractable(galleryMasterLockButton, isMaster); // only the master can toggle the lock
         SetText(galleryMasterNameLabel, _galleryMasterName);
-        SetText(galleryMasterLockTitle, Localize("Master lock:", "マスターロック:"));
-        SetText(galleryMasterLockLabel, galleryMasterLock ? "ON" : "OFF");
+        SetText(galleryMasterLockTitle, Localize("Master lock:", "マスターロック:", "实例主控锁定："));
+        SetText(galleryMasterLockLabel, Localize(galleryMasterLock ? "ON" : "OFF", galleryMasterLock ? "オン" : "オフ", galleryMasterLock ? "开启" : "关闭"));
         if (galleryMasterLockButton != null)
         {
             Color c = GalleryMasterLockColor();
@@ -1547,7 +1575,7 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
         if (galleryObjects == null || index < 0 || index >= galleryObjects.Length || galleryObjects[index] == null) return "";
         int count = galleryObjects[index].GetMaxLOD0SplatCount();
         if (count <= 0) return "";
-        return CompactSplatCount(count) + Localize(" splats", " Splat");
+        return CompactSplatCount(count) + Localize(" splats", " Splat", " 个 Splat");
     }
 
     string CompactSplatCount(int count)
@@ -1648,9 +1676,10 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
     public void IncreaseGaussianScale() { StepGaussianScale(gaussianScaleStep); }
     public void DecreaseGaussianScale() { StepGaussianScale(-gaussianScaleStep); }
 
-    void SetLanguage(int language) { selectedLanguage = Mathf.Clamp(language, LanguageEnglish, LanguageJapanese); RefreshUI(); }
+    void SetLanguage(int language) { selectedLanguage = Mathf.Clamp(language, LanguageEnglish, LanguageChineseSimplified); RefreshUI(); }
     public void SetLanguageEnglish() { SetLanguage(LanguageEnglish); }
     public void SetLanguageJapanese() { SetLanguage(LanguageJapanese); }
+    public void SetLanguageChineseSimplified() { SetLanguage(LanguageChineseSimplified); }
     public void ToggleAdvancedSettings() { showAdvancedSettings = !showAdvancedSettings; RefreshUI(); }
 
     public void SetQualityVeryLow() { if (gaussianSplatRenderer == null) return; gaussianSplatRenderer.SetQualityVeryLow(); RefreshUI(); }

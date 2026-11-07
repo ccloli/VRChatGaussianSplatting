@@ -945,7 +945,7 @@ public partial class GaussianSplatCombiner
             _processingQueuedFusedBake = true;
             try
             {
-                EditorUtility.DisplayProgressBar("Gaussian Splat Fusion", $"Fusing splat textures… ({_activeFusedBakeJob.StageName})", _activeFusedBakeJob.Progress);
+                EditorUtility.DisplayProgressBar(GSEditorText.T("Gaussian Splat Fusion", "Gaussian Splat の統合", "融合 Gaussian Splat"), GSEditorText.T($"Fusing splat textures… ({_activeFusedBakeJob.StageName})", $"Splat テクスチャを統合中…（{_activeFusedBakeJob.StageName}）", $"正在融合 Splat 纹理…（{_activeFusedBakeJob.StageName}）"), _activeFusedBakeJob.Progress);
                 if (_activeFusedBakeJob.Step())
                 {
                     if (!_activeFusedBakeJob.Failed && _activeFusedBakeCombiner != null)

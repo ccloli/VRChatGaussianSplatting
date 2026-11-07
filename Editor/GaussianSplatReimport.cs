@@ -23,12 +23,12 @@ namespace GaussianSplatting
             GaussianSplatImporter.ImportMetadata md = GaussianSplatImporter.ImportMetadata.FromJson(json);
             if (md == null || string.IsNullOrEmpty(md.sourcePath))
             {
-                EditorUtility.DisplayDialog("Reimport", "This splat has no stored import metadata (it predates the metadata feature, or was imported another way). Re-import it once via Gaussian Splatting -> Import Splats... to stamp it.", "OK");
+                EditorUtility.DisplayDialog(GSEditorText.T("Reimport", "再インポート", "重新导入"), GSEditorText.T("This splat has no stored import metadata (it predates the metadata feature, or was imported another way). Re-import it once via Gaussian Splatting -> Import Splats... to stamp it.", "この Splat にインポートメタデータがありません。Gaussian Splatting -> Import Splats... から再インポートしてください。", "此 Splat 没有保存导入元数据（可能创建于该功能推出之前，或通过其他方式导入）。请通过 Gaussian Splatting -> Import Splats... 重新导入一次，以保存元数据。"), "OK");
                 return null;
             }
             if (!File.Exists(md.sourcePath))
             {
-                EditorUtility.DisplayDialog("Reimport", $"Source file not found:\n{md.sourcePath}\n\nUse “Reimport (edit settings)…” and pick the file again.", "OK");
+                EditorUtility.DisplayDialog(GSEditorText.T("Reimport", "再インポート", "重新导入"), GSEditorText.T($"Source file not found:\n{md.sourcePath}\n\nUse “Reimport (edit settings)…” and pick the file again.", $"ソースファイルが見つかりません:\n{md.sourcePath}\n\n“Reimport (edit settings)…” でファイルを再選択してください。", $"找不到源文件：\n{md.sourcePath}\n\n请使用 “Reimport (edit settings)…” 重新选择文件。"), "OK");
                 return null;
             }
             return md;
@@ -75,7 +75,7 @@ namespace GaussianSplatting
                 null);
             if (importMethod == null)
             {
-                EditorUtility.DisplayDialog("Reimport", "LOD importer entry point was not found in this package.", "OK");
+                EditorUtility.DisplayDialog(GSEditorText.T("Reimport", "再インポート", "重新导入"), GSEditorText.T("LOD importer entry point was not found in this package.", "このパッケージに LOD インポーターのエントリーポイントがありません。", "此工具包中找不到 LOD 导入器的入口。"), "OK");
                 return false;
             }
 
@@ -88,7 +88,7 @@ namespace GaussianSplatting
             GaussianSplatImporter.ImportMetadata md = GaussianSplatImporter.ImportMetadata.FromJson(json);
             if (md == null || string.IsNullOrEmpty(md.sourcePath))
             {
-                EditorUtility.DisplayDialog("Reimport", "This splat has no stored import metadata. Re-import it once via Gaussian Splatting -> Import Splats... to stamp it.", "OK");
+                EditorUtility.DisplayDialog(GSEditorText.T("Reimport", "再インポート", "重新导入"), GSEditorText.T("This splat has no stored import metadata. Re-import it once via Gaussian Splatting -> Import Splats... to stamp it.", "この Splat にインポートメタデータがありません。Gaussian Splatting -> Import Splats... から再インポートしてください。", "此 Splat 没有保存导入元数据。请通过 Gaussian Splatting -> Import Splats... 重新导入一次，以保存元数据。"), "OK");
                 return;
             }
             GaussianSplatImportWizard.OpenForReimport(md);

@@ -369,8 +369,8 @@ namespace GaussianSplatting
                 }
 
                 processed += rowsThisChunk;
-                EditorUtility.DisplayProgressBar("Import Gaussian Splat PLY",
-                    $"Scanning PLY bounds {processed:N0}/{layout.count:N0} rows, accepted {acceptedCount:N0} splats",
+                EditorUtility.DisplayProgressBar(GSEditorText.T("Import Gaussian Splat PLY", "Gaussian Splat PLY をインポート", "导入 Gaussian Splat PLY"),
+                    GSEditorText.T($"Scanning PLY bounds {processed:N0}/{layout.count:N0} rows, accepted {acceptedCount:N0} splats", $"PLY 境界をスキャン中 {processed:N0}/{layout.count:N0} 行、採用 {acceptedCount:N0} Splat", $"正在扫描 PLY 边界 {processed:N0}/{layout.count:N0} 行，已接受 {acceptedCount:N0} 个 Splat"),
                     0.03f + 0.07f * (processed / (float)layout.count));
             }
             centroid = acceptedCount > 0 ? new Vector3((float)(sx / acceptedCount), (float)(sy / acceptedCount), (float)(sz / acceptedCount)) : Vector3.zero;
@@ -533,8 +533,8 @@ namespace GaussianSplatting
                         bufferCounts[bucket] = bucketBufferCount;
                     }
                     processed += rowsThisChunk;
-                    EditorUtility.DisplayProgressBar("Import Gaussian Splat PLY",
-                        $"Partitioning Hilbert buckets {processed:N0}/{layout.count:N0} rows into {bucketCount:N0} buckets",
+                    EditorUtility.DisplayProgressBar(GSEditorText.T("Import Gaussian Splat PLY", "Gaussian Splat PLY をインポート", "导入 Gaussian Splat PLY"),
+                        GSEditorText.T($"Partitioning Hilbert buckets {processed:N0}/{layout.count:N0} rows into {bucketCount:N0} buckets", $"Hilbert バケットに分割中 {processed:N0}/{layout.count:N0} 行、{bucketCount:N0} バケット", $"正在划分 Hilbert 桶 {processed:N0}/{layout.count:N0} 行，共 {bucketCount:N0} 个桶"),
                         0.1f + 0.15f * (processed / (float)layout.count));
                 }
 
@@ -683,8 +683,8 @@ namespace GaussianSplatting
 
             if (count > StreamedBucketTargetRecords && prefixBits < HilbertKeyBits)
             {
-                EditorUtility.DisplayProgressBar("Import Gaussian Splat PLY",
-                    $"Splitting large Hilbert bucket {bucketOrdinal:N0}/{bucketTotal:N0} ({count:N0} splats, prefix {prefixBits:N0} bits)",
+                EditorUtility.DisplayProgressBar(GSEditorText.T("Import Gaussian Splat PLY", "Gaussian Splat PLY をインポート", "导入 Gaussian Splat PLY"),
+                    GSEditorText.T($"Splitting large Hilbert bucket {bucketOrdinal:N0}/{bucketTotal:N0} ({count:N0} splats, prefix {prefixBits:N0} bits)", $"大きな Hilbert バケット {bucketOrdinal:N0}/{bucketTotal:N0} を分割中（{count:N0} Splat、プレフィックス {prefixBits:N0} ビット）", $"正在拆分大型 Hilbert 桶 {bucketOrdinal:N0}/{bucketTotal:N0}（{count:N0} 个 Splat，前缀 {prefixBits:N0} 位）"),
                     0.25f + 0.55f * ((bucketOrdinal - 1) / (float)Mathf.Max(1, bucketTotal)));
                 SplitBucketFile(path, count, prefixBits, tempFolder, out string[] childPaths, out long[] childCounts, out int childPrefixBits);
                 TryDeleteFile(path);
@@ -707,8 +707,8 @@ namespace GaussianSplatting
                 return;
             }
 
-            EditorUtility.DisplayProgressBar("Import Gaussian Splat PLY",
-                $"Sorting Hilbert bucket {bucketOrdinal:N0}/{bucketTotal:N0} leaf ({count:N0} splats, prefix {prefixBits:N0} bits)",
+            EditorUtility.DisplayProgressBar(GSEditorText.T("Import Gaussian Splat PLY", "Gaussian Splat PLY をインポート", "导入 Gaussian Splat PLY"),
+                GSEditorText.T($"Sorting Hilbert bucket {bucketOrdinal:N0}/{bucketTotal:N0} leaf ({count:N0} splats, prefix {prefixBits:N0} bits)", $"Hilbert バケット {bucketOrdinal:N0}/{bucketTotal:N0} のリーフをソート中（{count:N0} Splat、プレフィックス {prefixBits:N0} ビット）", $"正在排序 Hilbert 桶 {bucketOrdinal:N0}/{bucketTotal:N0} 的叶节点（{count:N0} 个 Splat，前缀 {prefixBits:N0} 位）"),
                 0.25f + 0.55f * ((bucketOrdinal - 1) / (float)Mathf.Max(1, bucketTotal)));
             BucketRecord[] records = ReadBucket(path, checked((int)count));
             if (records.Length > 1)

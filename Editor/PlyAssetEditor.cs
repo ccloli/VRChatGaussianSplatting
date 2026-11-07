@@ -93,12 +93,12 @@ namespace GaussianSplatting.Editor
 
             EditorGUILayout.Space();
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.LabelField(GSEditorText.T("Gaussian Splat PLY", "Gaussian Splat PLY"), EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(GSEditorText.T("Gaussian Splat PLY", "Gaussian Splat PLY", "Gaussian Splat PLY"), EditorStyles.boldLabel);
 
-            DrawInfoRow(GSEditorText.T("Asset Path", "アセットパス"), assetPath);
+            DrawInfoRow(GSEditorText.T("Asset Path", "アセットパス", "资源路径"), assetPath);
             if (info.fileExists)
             {
-                DrawInfoRow(GSEditorText.T("File Size", "ファイルサイズ"), EditorUtility.FormatBytes(info.fileSizeBytes));
+                DrawInfoRow(GSEditorText.T("File Size", "ファイルサイズ", "文件大小"), EditorUtility.FormatBytes(info.fileSizeBytes));
             }
 
             if (!string.IsNullOrEmpty(info.error))
@@ -107,18 +107,18 @@ namespace GaussianSplatting.Editor
             }
             else
             {
-                DrawInfoRow(GSEditorText.T("Splats", "Splat 数"), info.splatCount.ToString("N0"));
-                DrawInfoRow(GSEditorText.T("Vertex Stride", "頂点ストライド"), info.vertexStride + " bytes");
-                DrawInfoRow(GSEditorText.T("Header Attributes", "ヘッダー属性"), info.attributeCount.ToString());
-                DrawInfoRow(GSEditorText.T("Gaussian Splat", "Gaussian Splat"), info.IsGaussianSplat ? GSEditorText.T("Yes", "はい") : GSEditorText.T("No", "いいえ"));
-                DrawInfoRow(GSEditorText.T("Available SH Band", "利用可能な SH バンド"), info.availableShBand.ToString());
+                DrawInfoRow(GSEditorText.T("Splats", "Splat 数", "Splat 数量"), info.splatCount.ToString("N0"));
+                DrawInfoRow(GSEditorText.T("Vertex Stride", "頂点ストライド", "顶点步长"), info.vertexStride + " bytes");
+                DrawInfoRow(GSEditorText.T("Header Attributes", "ヘッダー属性", "文件头属性"), info.attributeCount.ToString());
+                DrawInfoRow(GSEditorText.T("Gaussian Splat", "Gaussian Splat", "Gaussian Splat"), info.IsGaussianSplat ? GSEditorText.T("Yes", "はい", "是") : GSEditorText.T("No", "いいえ", "否"));
+                DrawInfoRow(GSEditorText.T("Available SH Band", "利用可能な SH バンド", "可用 SH 阶数"), info.availableShBand.ToString());
 
                 if (!string.IsNullOrEmpty(info.missingRequiredAttributes))
                 {
-                    EditorGUILayout.HelpBox(GSEditorText.T("Missing required float attributes: ", "必須 float 属性が不足しています: ") + info.missingRequiredAttributes, MessageType.Warning);
+                    EditorGUILayout.HelpBox(GSEditorText.T("Missing required float attributes: ", "必須 float 属性が不足しています: ", "缺少必需的 float 属性：") + info.missingRequiredAttributes, MessageType.Warning);
                 }
 
-                _showAttributeList = EditorGUILayout.Foldout(_showAttributeList, GSEditorText.T("Header Attributes", "ヘッダー属性"), true);
+                _showAttributeList = EditorGUILayout.Foldout(_showAttributeList, GSEditorText.T("Header Attributes", "ヘッダー属性", "文件头属性"), true);
                 if (_showAttributeList && info.attributeLines != null)
                 {
                     for (int i = 0; i < info.attributeLines.Count; i++)
@@ -129,34 +129,34 @@ namespace GaussianSplatting.Editor
             }
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField(GSEditorText.T("Import", "インポート"), EditorStyles.boldLabel);
-            _prefabOutputPath = EditorGUILayout.TextField(GSEditorText.T("Prefab Output", "Prefab 出力先"), _prefabOutputPath);
+            EditorGUILayout.LabelField(GSEditorText.T("Import", "インポート", "导入"), EditorStyles.boldLabel);
+            _prefabOutputPath = EditorGUILayout.TextField(GSEditorText.T("Prefab Output", "Prefab 出力先", "预制体输出路径"), _prefabOutputPath);
 
             string normalizedPrefabPath = NormalizePrefabAssetPath(_prefabOutputPath);
             if (!IsValidPrefabAssetPath(normalizedPrefabPath))
             {
                 EditorGUILayout.HelpBox(GSEditorText.T(
                     "Prefab Output must be a path under Assets/ and end with .prefab.",
-                    "Prefab 出力先は Assets/ 配下で、.prefab で終わるパスにしてください。"), MessageType.Error);
+                    "Prefab 出力先は Assets/ 配下で、.prefab で終わるパスにしてください。", "预制体输出路径必须位于 Assets/ 下，且以 .prefab 结尾。"), MessageType.Error);
             }
             else if (normalizedPrefabPath != _prefabOutputPath)
             {
-                EditorGUILayout.HelpBox(GSEditorText.T("The output path will be normalized to ", "出力パスは次のように正規化されます: ") + normalizedPrefabPath, MessageType.Info);
+                EditorGUILayout.HelpBox(GSEditorText.T("The output path will be normalized to ", "出力パスは次のように正規化されます: ", "输出路径将规范化为：") + normalizedPrefabPath, MessageType.Info);
             }
 
             EditorGUILayout.HelpBox(GSEditorText.T(
                 "Import With Default Settings uses the same defaults as the package import wizard. Use Open Import Wizard for advanced settings.",
-                "デフォルト設定でインポートは、パッケージのインポートウィザードと同じ既定値を使用します。詳細設定にはインポートウィザードを開いてください。"), MessageType.Info);
+                "デフォルト設定でインポートは、パッケージのインポートウィザードと同じ既定値を使用します。詳細設定にはインポートウィザードを開いてください。", "“使用默认设置导入”与本工具包的导入向导使用相同的默认值。高级设置请使用“打开导入向导”。"), MessageType.Info);
 
             using (new EditorGUI.DisabledScope(!info.IsGaussianSplat || !IsValidPrefabAssetPath(normalizedPrefabPath)))
             {
-                if (GUILayout.Button(GSEditorText.T("Import With Default Settings", "デフォルト設定でインポート")))
+                if (GUILayout.Button(GSEditorText.T("Import With Default Settings", "デフォルト設定でインポート", "使用默认设置导入")))
                 {
                     ImportSelectedPly(absolutePath, normalizedPrefabPath);
                 }
             }
 
-            if (GUILayout.Button(GSEditorText.T("Open Import Wizard", "インポートウィザードを開く")))
+            if (GUILayout.Button(GSEditorText.T("Open Import Wizard", "インポートウィザードを開く", "打开导入向导")))
             {
                 GaussianSplatting.Editor.Importers.GaussianSplatImportWizard.OpenWithSource(absolutePath);
             }
@@ -306,8 +306,8 @@ namespace GaussianSplatting.Editor
             try
             {
                 EditorUtility.DisplayProgressBar(
-                    GSEditorText.T("PLY Import", "PLY インポート"),
-                    GSEditorText.T("Importing ", "インポート中: ") + Path.GetFileName(absolutePlyPath),
+                    GSEditorText.T("PLY Import", "PLY インポート", "导入 PLY"),
+                    GSEditorText.T("Importing ", "インポート中: ", "正在导入：") + Path.GetFileName(absolutePlyPath),
                     0.0f);
                 GaussianSplatting.Editor.Importers.GaussianSplatImportWizard.ImportWithDefaults(absolutePlyPath, prefabAssetPath);
                 AssetDatabase.SaveAssets();
@@ -322,7 +322,7 @@ namespace GaussianSplatting.Editor
             }
             catch (Exception exception)
             {
-                EditorUtility.DisplayDialog(GSEditorText.T("PLY Import Failed", "PLY インポート失敗"), exception.Message, "OK");
+                EditorUtility.DisplayDialog(GSEditorText.T("PLY Import Failed", "PLY インポート失敗", "PLY 导入失败"), exception.Message, "OK");
                 Debug.LogException(exception);
             }
             finally

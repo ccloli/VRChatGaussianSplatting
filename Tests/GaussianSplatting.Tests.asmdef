@@ -4,6 +4,7 @@
     "references": [
         "GaussianSplatting",
         "UdonSharp.Runtime",
+        "Unity.TextMeshPro",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

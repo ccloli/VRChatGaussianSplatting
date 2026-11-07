@@ -87,11 +87,11 @@ namespace GaussianSplatting.Editor
 
             serializedObject.Update();
 
-            DrawSettingsGroup(GSEditorText.T("Rendering Settings", "表示設定"), DrawRenderingSettings);
+            DrawSettingsGroup(GSEditorText.T("Rendering Settings", "表示設定", "渲染设置"), DrawRenderingSettings);
             EditorGUILayout.Space();
-            DrawSettingsGroup(GSEditorText.T("Sorting Settings", "ソート設定"), DrawSortingSettings);
+            DrawSettingsGroup(GSEditorText.T("Sorting Settings", "ソート設定", "排序设置"), DrawSortingSettings);
             EditorGUILayout.Space();
-            DrawSettingsGroup(GSEditorText.T("Material Settings", "マテリアル設定"), DrawMaterialSettings);
+            DrawSettingsGroup(GSEditorText.T("Material Settings", "マテリアル設定", "材质设置"), DrawMaterialSettings);
 
             bool changed = serializedObject.ApplyModifiedProperties();
 
@@ -119,27 +119,27 @@ namespace GaussianSplatting.Editor
             if (hasActiveLodObjects)
             {
                 DrawCombinedLodBudgetField();
-                EditorGUILayout.PropertyField(_debugDrawLodGrid, GSEditorText.C("Debug LOD", "LOD をデバッグ表示"));
+                EditorGUILayout.PropertyField(_debugDrawLodGrid, GSEditorText.C("Debug LOD", "LOD をデバッグ表示", "调试 LOD"));
             }
-            EditorGUILayout.PropertyField(_debugRenderOpaqueEllipsoids, GSEditorText.C("Debug Opaque Ellipsoids", "不透明楕円体をデバッグ表示"));
-            EditorGUILayout.PropertyField(_debugDrawChunkBounds, GSEditorText.C("Debug Chunk Bounds", "チャンク境界をデバッグ表示"));
-            EditorGUILayout.PropertyField(_debugDrawChunkCenterArea, GSEditorText.C("Debug Chunk Center+Area", "チャンク重心+面積をデバッグ表示"));
+            EditorGUILayout.PropertyField(_debugRenderOpaqueEllipsoids, GSEditorText.C("Debug Opaque Ellipsoids", "不透明楕円体をデバッグ表示", "调试不透明椭球体"));
+            EditorGUILayout.PropertyField(_debugDrawChunkBounds, GSEditorText.C("Debug Chunk Bounds", "チャンク境界をデバッグ表示", "调试分块边界"));
+            EditorGUILayout.PropertyField(_debugDrawChunkCenterArea, GSEditorText.C("Debug Chunk Center+Area", "チャンク重心+面積をデバッグ表示", "调试分块中心和面积"));
             if (!serializedObject.isEditingMultipleObjects && target is GaussianSplatRenderer sceneRenderer)
             {
-                EditorGUILayout.LabelField(GSEditorText.T("Rendered Splat Count", "描画スプラット数"), sceneRenderer.GetCurrentRenderedSplatCount().ToString());
-                EditorGUILayout.LabelField(GSEditorText.T("Baked Splat Count", "ベイク済みスプラット数"), sceneRenderer.GetTotalBakedSplatCount().ToString("N0"));
+                EditorGUILayout.LabelField(GSEditorText.T("Rendered Splat Count", "描画スプラット数", "已渲染 Splat 数量"), sceneRenderer.GetCurrentRenderedSplatCount().ToString());
+                EditorGUILayout.LabelField(GSEditorText.T("Baked Splat Count", "ベイク済みスプラット数", "已烘焙 Splat 数量"), sceneRenderer.GetTotalBakedSplatCount().ToString("N0"));
                 long splatDataBytes = sceneRenderer.GetBakedSplatDataBytes();
                 if (splatDataBytes > 0)
                 {
                     // Build/download is an LZ4 asset bundle; the high-entropy RGBA32 splat textures compress to
                     // ~0.85x (measured on a 4.5M-splat build: 81.7 MB uncompressed source -> ~70 MB in the .vrcw).
                     long compressedBytes = (long)(splatDataBytes * SPLAT_DATA_DOWNLOAD_COMPRESSION_ESTIMATE);
-                    EditorGUILayout.LabelField(GSEditorText.T("Splat Data (download est.)", "スプラットデータ (DL推定)"),
+                    EditorGUILayout.LabelField(GSEditorText.T("Splat Data (download est.)", "スプラットデータ (DL推定)", "Splat 数据（预计下载量）"),
                         EditorUtility.FormatBytes(compressedBytes) + " (~" + EditorUtility.FormatBytes(splatDataBytes) + " raw)");
                     if (compressedBytes > VRC_WORLD_SIZE_WARNING_BYTES)
                     {
                         EditorGUILayout.HelpBox(
-                            "Estimated splat data alone exceeds the 1.2 GB VRChat world size limit. Reduce baked splat data before uploading.",
+                            GSEditorText.T("Estimated splat data alone exceeds the 1.2 GB VRChat world size limit. Reduce baked splat data before uploading.", "Splat データの推定サイズだけで VRChat ワールドの上限 1.2 GB を超えています。アップロード前にデータを減らしてください。", "当前预估的 Splat 数据大小已超过 VRChat 世界的 1.2 GB 大小限制。请在上传前减少需要烘焙的 Splat 数据。"),
                             MessageType.Warning);
                     }
                 }
@@ -147,8 +147,8 @@ namespace GaussianSplatting.Editor
                 int reservedCount = sceneRenderer.GetEditorReadbackReservedSplatCount();
                 if (reservedCount > 0)
                 {
-                    EditorGUILayout.LabelField(GSEditorText.T("Editor Readback Splat Count", "エディタ読み戻しスプラット数"), readbackCount + " / " + reservedCount);
-                    EditorGUILayout.LabelField(GSEditorText.T("Editor Readback Log2 Alpha", "エディタ読み戻し Log2 アルファ"), sceneRenderer.GetEditorReadbackAlpha().ToString("0.###"));
+                    EditorGUILayout.LabelField(GSEditorText.T("Editor Readback Splat Count", "エディタ読み戻しスプラット数", "编辑器回读 Splat 数量"), readbackCount + " / " + reservedCount);
+                    EditorGUILayout.LabelField(GSEditorText.T("Editor Readback Log2 Alpha", "エディタ読み戻し Log2 アルファ", "编辑器回读 Log2 Alpha"), sceneRenderer.GetEditorReadbackAlpha().ToString("0.###"));
                 }
             }
         }
@@ -159,7 +159,7 @@ namespace GaussianSplatting.Editor
             {
                 EditorGUI.showMixedValue = _combinedLodSplatBudgetPC.hasMultipleDifferentValues;
                 EditorGUI.BeginChangeCheck();
-                int nextPcBudget = EditorGUILayout.IntField(GSEditorText.T("Combined LOD PC Cap", "統合 LOD PC 上限"), _combinedLodSplatBudgetPC.intValue);
+                int nextPcBudget = EditorGUILayout.IntField(GSEditorText.T("Combined LOD PC Cap", "統合 LOD PC 上限", "合并 LOD PC 上限"), _combinedLodSplatBudgetPC.intValue);
                 if (EditorGUI.EndChangeCheck())
                 {
                     _combinedLodSplatBudgetPC.intValue = Mathf.Max(0, nextPcBudget);
@@ -170,7 +170,7 @@ namespace GaussianSplatting.Editor
             {
                 EditorGUI.showMixedValue = _combinedLodSplatBudgetAndroid.hasMultipleDifferentValues;
                 EditorGUI.BeginChangeCheck();
-                int nextAndroidBudget = EditorGUILayout.IntField(GSEditorText.T("Combined LOD Android Cap", "統合 LOD Android 上限"), _combinedLodSplatBudgetAndroid.intValue);
+                int nextAndroidBudget = EditorGUILayout.IntField(GSEditorText.T("Combined LOD Android Cap", "統合 LOD Android 上限", "合并 LOD Android 上限"), _combinedLodSplatBudgetAndroid.intValue);
                 if (EditorGUI.EndChangeCheck())
                 {
                     _combinedLodSplatBudgetAndroid.intValue = Mathf.Max(0, nextAndroidBudget);
@@ -181,7 +181,7 @@ namespace GaussianSplatting.Editor
             {
                 EditorGUI.showMixedValue = _combinedLodTargetScale.hasMultipleDifferentValues;
                 EditorGUI.BeginChangeCheck();
-                float nextTargetScale = EditorGUILayout.Slider(GSEditorText.T("Combined LOD Target Scale", "統合 LOD 目標倍率"), _combinedLodTargetScale.floatValue > 0.0f ? _combinedLodTargetScale.floatValue : 0.95f, 0.1f, 1.0f);
+                float nextTargetScale = EditorGUILayout.Slider(GSEditorText.T("Combined LOD Target Scale", "統合 LOD 目標倍率", "合并 LOD 目标缩放"), _combinedLodTargetScale.floatValue > 0.0f ? _combinedLodTargetScale.floatValue : 0.95f, 0.1f, 1.0f);
                 if (EditorGUI.EndChangeCheck())
                 {
                     _combinedLodTargetScale.floatValue = Mathf.Clamp(nextTargetScale, 0.1f, 1.0f);
@@ -192,7 +192,7 @@ namespace GaussianSplatting.Editor
             {
                 EditorGUI.showMixedValue = _combinedLodDirectionalBias.hasMultipleDifferentValues;
                 EditorGUI.BeginChangeCheck();
-                float nextDirectionalBias = EditorGUILayout.Slider(GSEditorText.T("Combined LOD Directional Bias", "統合 LOD 方向バイアス"), _combinedLodDirectionalBias.floatValue > 0.0f ? _combinedLodDirectionalBias.floatValue : 2.0f, 1.0f, 16.0f);
+                float nextDirectionalBias = EditorGUILayout.Slider(GSEditorText.T("Combined LOD Directional Bias", "統合 LOD 方向バイアス", "合并 LOD 方向偏置"), _combinedLodDirectionalBias.floatValue > 0.0f ? _combinedLodDirectionalBias.floatValue : 2.0f, 1.0f, 16.0f);
                 if (EditorGUI.EndChangeCheck())
                 {
                     _combinedLodDirectionalBias.floatValue = Mathf.Clamp(nextDirectionalBias, 1.0f, 16.0f);
@@ -203,7 +203,7 @@ namespace GaussianSplatting.Editor
             {
                 EditorGUI.showMixedValue = _lodMaxSplatsPerPixel.hasMultipleDifferentValues;
                 EditorGUI.BeginChangeCheck();
-                float nextMaxPerPixel = EditorGUILayout.Slider(GSEditorText.T("LOD Max Splats / Pixel", "LOD 最大スプラット/ピクセル"), Mathf.Max(0.0f, _lodMaxSplatsPerPixel.floatValue), 0.0f, 4.0f);
+                float nextMaxPerPixel = EditorGUILayout.Slider(GSEditorText.T("LOD Max Splats / Pixel", "LOD 最大スプラット/ピクセル", "LOD 每像素最大 Splat 数"), Mathf.Max(0.0f, _lodMaxSplatsPerPixel.floatValue), 0.0f, 4.0f);
                 if (EditorGUI.EndChangeCheck())
                 {
                     _lodMaxSplatsPerPixel.floatValue = Mathf.Max(0.0f, nextMaxPerPixel);
@@ -213,10 +213,10 @@ namespace GaussianSplatting.Editor
             if (_startupQualityPreset != null)
             {
                 // Index 0 = "Keep Inspector Settings" maps to the stored value -1; indices 1..4 map to 0..3.
-                string[] startupLabels = { GSEditorText.T("Keep Inspector Settings", "インスペクター設定を維持"), GSEditorText.T("Very Low", "最低"), GSEditorText.T("Low", "低"), GSEditorText.T("Medium", "中"), GSEditorText.T("High", "高") };
+                string[] startupLabels = { GSEditorText.T("Keep Inspector Settings", "インスペクター設定を維持", "沿用 Inspector 设置"), GSEditorText.T("Very Low", "最低", "极低"), GSEditorText.T("Low", "低", "低"), GSEditorText.T("Medium", "中", "中"), GSEditorText.T("High", "高", "高") };
                 EditorGUI.showMixedValue = _startupQualityPreset.hasMultipleDifferentValues;
                 EditorGUI.BeginChangeCheck();
-                int nextStartup = EditorGUILayout.Popup(GSEditorText.T("Startup Quality", "起動時の品質"), Mathf.Clamp(_startupQualityPreset.intValue + 1, 0, startupLabels.Length - 1), startupLabels);
+                int nextStartup = EditorGUILayout.Popup(GSEditorText.T("Startup Quality", "起動時の品質", "启动画质"), Mathf.Clamp(_startupQualityPreset.intValue + 1, 0, startupLabels.Length - 1), startupLabels);
                 if (EditorGUI.EndChangeCheck())
                 {
                     _startupQualityPreset.intValue = nextStartup - 1;
@@ -232,7 +232,7 @@ namespace GaussianSplatting.Editor
                     // platform (PC cap) for reference.
                     EditorGUI.showMixedValue = _startupLodCapacity.hasMultipleDifferentValues;
                     EditorGUI.BeginChangeCheck();
-                    float nextCapacity = EditorGUILayout.Slider(GSEditorText.T("Startup LOD Capacity", "起動時 LOD 容量"), Mathf.Clamp01(_startupLodCapacity.floatValue), 0.0f, 1.0f);
+                    float nextCapacity = EditorGUILayout.Slider(GSEditorText.T("Startup LOD Capacity", "起動時 LOD 容量", "启动时 LOD 容量"), Mathf.Clamp01(_startupLodCapacity.floatValue), 0.0f, 1.0f);
                     if (EditorGUI.EndChangeCheck())
                     {
                         _startupLodCapacity.floatValue = Mathf.Clamp01(nextCapacity);
@@ -241,15 +241,16 @@ namespace GaussianSplatting.Editor
                     int sliderMin = sceneRenderer.GetCombinedLodSplatBudgetSliderMin();
                     int sliderMax = sceneRenderer.GetCombinedLodSplatBudgetSliderMax();
                     int resolved = Mathf.Clamp(Mathf.RoundToInt(Mathf.Clamp01(_startupLodCapacity.floatValue) * sliderMax), sliderMin, sliderMax);
-                    EditorGUILayout.LabelField(" ", GSEditorText.T("= " + resolved.ToString("N0") + " splats (PC cap)", "= " + resolved.ToString("N0") + " スプラット (PC 上限)"));
+                    EditorGUILayout.LabelField(" ", GSEditorText.T("= " + resolved.ToString("N0") + " splats (PC cap)", "= " + resolved.ToString("N0") + " スプラット (PC 上限)", "= " + resolved.ToString("N0") + " 个 Splat（PC 上限）"));
                 }
                 int effectiveBudget = sceneRenderer.GetEffectiveCombinedLodSplatBudget();
                 int targetBudget = effectiveBudget > 0 ? Mathf.FloorToInt(effectiveBudget * sceneRenderer.GetEffectiveCombinedLodTargetScale()) : 0;
-                string effective = effectiveBudget == 0 ? GSEditorText.T("No cap", "上限なし") : effectiveBudget.ToString();
-                string target = effectiveBudget == 0 ? GSEditorText.T("No cap", "上限なし") : targetBudget.ToString();
+                string effective = effectiveBudget == 0 ? GSEditorText.T("No cap", "上限なし", "无上限") : effectiveBudget.ToString();
+                string target = effectiveBudget == 0 ? GSEditorText.T("No cap", "上限なし", "无上限") : targetBudget.ToString();
                 EditorGUILayout.HelpBox(GSEditorText.T(
                     "Editor previews use the PC cap. Android builds use the Android cap. 0 disables the cap. Effective cap: " + effective + ". LOD selection target: " + target + ".",
-                    "エディタプレビューでは PC 上限を使用します。Android ビルドでは Android 上限を使用します。0 は上限なしです。現在の上限: " + effective + "。LOD 選択目標: " + target + "。"), MessageType.None);
+                    "エディタプレビューでは PC 上限を使用します。Android ビルドでは Android 上限を使用します。0 は上限なしです。現在の上限: " + effective + "。LOD 選択目標: " + target + "。",
+                    "编辑器预览使用 PC 上限，Android 构建使用 Android 上限。0 表示无上限。当前上限：" + effective + "。LOD 选择目标：" + target + "。"), MessageType.None);
             }
         }
 
@@ -268,12 +269,12 @@ namespace GaussianSplatting.Editor
 
         void DrawSortingSettings()
         {
-            EditorGUILayout.PropertyField(_cameraPositionQuantization, GSEditorText.C("Camera Position Quantization", "カメラ位置量子化"));
+            EditorGUILayout.PropertyField(_cameraPositionQuantization, GSEditorText.C("Camera Position Quantization", "カメラ位置量子化", "相机位置量化"));
         }
 
         void DrawMaterialSettings()
         {
-            EditorGUILayout.IntSlider(_requestedSHBand, 0, 3, GSEditorText.C("Requested SH Band", "要求 SH バンド"));
+            EditorGUILayout.IntSlider(_requestedSHBand, 0, 3, GSEditorText.C("Requested SH Band", "要求 SH バンド", "请求的 SH 阶数"));
             if (!serializedObject.isEditingMultipleObjects && target is GaussianSplatRenderer shRenderer)
             {
                 GaussianSplatCombiner shCombiner = shRenderer.GetCombiner();
@@ -282,40 +283,41 @@ namespace GaussianSplatting.Editor
                 {
                     EditorGUILayout.HelpBox(GSEditorText.T(
                         $"Spherical harmonics were dropped for {droppedSh} object(s): the scene's total SH exceeds the single fused SH texture cap (16384² texels). Those splats render without view-dependent color regardless of this setting. Lower the SH band on some splats, reduce splat counts, or split the scene.",
-                        $"{droppedSh} 個のオブジェクトの球面調和が破棄されました: シーン全体の SH が単一の統合 SH テクスチャ上限 (16384² テクセル) を超えています。該当スプラットはこの設定に関わらず視点依存色なしで描画されます。一部スプラットの SH バンドを下げる、スプラット数を減らす、またはシーンを分割してください。"),
+                        $"{droppedSh} 個のオブジェクトの球面調和が破棄されました: シーン全体の SH が単一の統合 SH テクスチャ上限 (16384² テクセル) を超えています。該当スプラットはこの設定に関わらず視点依存色なしで描画されます。一部スプラットの SH バンドを下げる、スプラット数を減らす、またはシーンを分割してください。",
+                        $"{droppedSh} 个对象的球谐数据已被丢弃：场景 SH 总量超过单张融合 SH 纹理的上限（16384² 纹素）。这些 Splat 无论此设置为何值，都将不带视角相关颜色渲染。请降低部分 Splat 的 SH 阶数、减少 Splat 数量或拆分场景。"),
                         MessageType.Warning);
                 }
                 DrawFusedObjectTable(shCombiner);
             }
-            EditorGUILayout.PropertyField(_useVrcLightVolumes, GSEditorText.C("Use VRC Light Volumes", "VRC Light Volumes を使用"));
+            EditorGUILayout.PropertyField(_useVrcLightVolumes, GSEditorText.C("Use VRC Light Volumes", "VRC Light Volumes を使用", "使用 VRC Light Volumes"));
             using (new EditorGUI.DisabledScope(!_useVrcLightVolumes.boolValue))
             {
-                EditorGUILayout.Slider(_lightVolumeIntensity, 0.0f, 10.0f, GSEditorText.C("Light Volume Intensity", "ライトボリューム強度"));
+                EditorGUILayout.Slider(_lightVolumeIntensity, 0.0f, 10.0f, GSEditorText.C("Light Volume Intensity", "ライトボリューム強度", "光照体积强度"));
             }
 
             EditorGUILayout.Space();
             DrawQualityPresetButtons();
-            EditorGUILayout.PropertyField(_overrideRenderQueue, GSEditorText.C("Override Render Queue", "レンダーキューを上書き"));
+            EditorGUILayout.PropertyField(_overrideRenderQueue, GSEditorText.C("Override Render Queue", "レンダーキューを上書き", "覆盖渲染队列"));
             using (new EditorGUI.DisabledScope(!_overrideRenderQueue.boolValue))
             {
-                EditorGUILayout.IntSlider(_startRenderQueue, 2000, 5000, GSEditorText.C("Start Render Queue", "開始レンダーキュー"));
+                EditorGUILayout.IntSlider(_startRenderQueue, 2000, 5000, GSEditorText.C("Start Render Queue", "開始レンダーキュー", "起始渲染队列"));
             }
             EditorGUILayout.Space();
-            EditorGUILayout.PropertyField(_overrideMaterialProperties, GSEditorText.C("Override Material Properties", "マテリアル設定を上書き"));
+            EditorGUILayout.PropertyField(_overrideMaterialProperties, GSEditorText.C("Override Material Properties", "マテリアル設定を上書き", "覆盖材质属性"));
             using (new EditorGUI.DisabledScope(!_overrideMaterialProperties.boolValue))
             {
-                EditorGUILayout.Slider(_gaussianScale, 0.0f, 2.0f, GSEditorText.C("Gaussian Scale", "ガウススケール"));
-                EditorGUILayout.Slider(_thinThreshold, 0.0f, 1.0f, GSEditorText.C("Thinness Threshold", "薄さしきい値"));
-                EditorGUILayout.Slider(_antiAliasing, 0.0f, 5.0f, GSEditorText.C("Anti Aliasing", "アンチエイリアス"));
-                EditorGUILayout.Slider(_log2MinScale, -20.0f, 10.0f, GSEditorText.C("Log2 Minimum Scale", "Log2 最小スケール"));
-                EditorGUILayout.Slider(_alphaCutoff, 0.0f, 1.0f, GSEditorText.C("Alpha Cutoff", "アルファカットオフ"));
-                EditorGUILayout.Slider(_alphaCull, 0.0f, 1.0f, GSEditorText.C("Alpha Cull", "アルファカリング"));
-                EditorGUILayout.Slider(_lodCull, 0.0f, 0.1f, GSEditorText.C("LOD Cull", "LOD カリング"));
-                EditorGUILayout.Slider(_scaleCutoff, 0.0f, 100.0f, GSEditorText.C("Scale Cutoff", "スケールカットオフ"));
-                EditorGUILayout.Slider(_exposure, 0.0f, 5.0f, GSEditorText.C("Exposure", "露出"));
-                EditorGUILayout.Slider(_opacity, 0.0f, 5.0f, GSEditorText.C("Opacity", "不透明度"));
-                EditorGUILayout.PropertyField(_oklchShift, GSEditorText.C("OKLCH Color Shift", "OKLCH 色シフト"));
-                DrawMinFloatField(_gamma, GSEditorText.C("Gamma", "ガンマ"), 0.001f);
+                EditorGUILayout.Slider(_gaussianScale, 0.0f, 2.0f, GSEditorText.C("Gaussian Scale", "ガウススケール", "高斯缩放"));
+                EditorGUILayout.Slider(_thinThreshold, 0.0f, 1.0f, GSEditorText.C("Thinness Threshold", "薄さしきい値", "薄度阈值"));
+                EditorGUILayout.Slider(_antiAliasing, 0.0f, 5.0f, GSEditorText.C("Anti Aliasing", "アンチエイリアス", "抗锯齿"));
+                EditorGUILayout.Slider(_log2MinScale, -20.0f, 10.0f, GSEditorText.C("Log2 Minimum Scale", "Log2 最小スケール", "Log2 最小缩放"));
+                EditorGUILayout.Slider(_alphaCutoff, 0.0f, 1.0f, GSEditorText.C("Alpha Cutoff", "アルファカットオフ", "Alpha 截断阈值"));
+                EditorGUILayout.Slider(_alphaCull, 0.0f, 1.0f, GSEditorText.C("Alpha Cull", "アルファカリング", "Alpha 剔除阈值"));
+                EditorGUILayout.Slider(_lodCull, 0.0f, 0.1f, GSEditorText.C("LOD Cull", "LOD カリング", "LOD 剔除"));
+                EditorGUILayout.Slider(_scaleCutoff, 0.0f, 100.0f, GSEditorText.C("Scale Cutoff", "スケールカットオフ", "缩放截断阈值"));
+                EditorGUILayout.Slider(_exposure, 0.0f, 5.0f, GSEditorText.C("Exposure", "露出", "曝光"));
+                EditorGUILayout.Slider(_opacity, 0.0f, 5.0f, GSEditorText.C("Opacity", "不透明度", "不透明度"));
+                EditorGUILayout.PropertyField(_oklchShift, GSEditorText.C("OKLCH Color Shift", "OKLCH 色シフト", "OKLCH 颜色偏移"));
+                DrawMinFloatField(_gamma, GSEditorText.C("Gamma", "ガンマ", "伽马"), 0.001f);
             }
         }
 
@@ -351,7 +353,7 @@ namespace GaussianSplatting.Editor
             {
                 return;
             }
-            _showFusedObjectTable = EditorGUILayout.Foldout(_showFusedObjectTable, GSEditorText.T("Fused Objects (debug)", "統合オブジェクト (デバッグ)"), true);
+            _showFusedObjectTable = EditorGUILayout.Foldout(_showFusedObjectTable, GSEditorText.T("Fused Objects (debug)", "統合オブジェクト (デバッグ)", "融合对象（调试）"), true);
             if (!_showFusedObjectTable)
             {
                 return;
@@ -366,35 +368,38 @@ namespace GaussianSplatting.Editor
             }
             using (new EditorGUI.IndentLevelScope())
             {
-                EditorGUILayout.LabelField(GSEditorText.T("Objects / Splats", "オブジェクト / スプラット"), $"{rows.Count}  /  {splatTotal:N0}");
-                EditorGUILayout.LabelField(GSEditorText.T("Fused SH used / cap", "統合 SH 使用 / 上限"), $"{shUsed:N0} / {cap:N0}  ({(cap > 0 ? 100.0 * shUsed / cap : 0):F1}%)");
+                EditorGUILayout.LabelField(GSEditorText.T("Objects / Splats", "オブジェクト / スプラット", "对象 / Splat"), $"{rows.Count}  /  {splatTotal:N0}");
+                EditorGUILayout.LabelField(GSEditorText.T("Fused SH used / cap", "統合 SH 使用 / 上限", "融合 SH 用量 / 上限"), $"{shUsed:N0} / {cap:N0}  ({(cap > 0 ? 100.0 * shUsed / cap : 0):F1}%)");
                 if (shRequested != shUsed)
                 {
-                    EditorGUILayout.LabelField(GSEditorText.T("SH requested (incl. dropped)", "SH 要求 (破棄含む)"), $"{shRequested:N0}  ({(cap > 0 ? 100.0 * shRequested / cap : 0):F1}%)");
+                    EditorGUILayout.LabelField(GSEditorText.T("SH requested (incl. dropped)", "SH 要求 (破棄含む)", "请求的 SH（含已丢弃）"), $"{shRequested:N0}  ({(cap > 0 ? 100.0 * shRequested / cap : 0):F1}%)");
                 }
                 EditorGUILayout.Space(2);
                 var head = EditorStyles.miniBoldLabel;
                 var cell = EditorStyles.miniLabel;
-                DrawFusedTableRow("Object", "Active", "Splats", "Files", "Chunks", "Band", "SH texels", "Dropped", head);
+                DrawFusedTableRow(GSEditorText.T("Object", "オブジェクト", "对象"), GSEditorText.T("Active", "有効", "启用"),
+                    GSEditorText.T("Splats", "Splat 数", "Splat 数"), GSEditorText.T("Files", "ファイル", "文件"),
+                    GSEditorText.T("Chunks", "チャンク", "分块"), GSEditorText.T("Band", "バンド", "阶数"),
+                    GSEditorText.T("SH texels", "SH テクセル", "SH 纹素"), GSEditorText.T("Dropped", "破棄", "丢弃"), head);
                 foreach (var r in rows)
                 {
                     int band = r.shCoeff >= 15 ? 3 : (r.shCoeff >= 8 ? 2 : (r.shCoeff >= 3 ? 1 : 0));
                     string shTex = r.shCoeff > 0 ? $"{r.shTexels:N0} ({(cap > 0 ? 100.0 * r.shTexels / cap : 0):F1}%)" : "-";
-                    string flag = r.shDropped ? "DROPPED" : (r.shCoeff > 0 ? "" : "no SH");
-                    DrawFusedTableRow(r.name, r.active ? "yes" : "no", $"{r.splats:N0}", r.files.ToString(), r.chunks.ToString(), band.ToString(), shTex, flag, cell);
+                    string flag = r.shDropped ? GSEditorText.T("DROPPED", "破棄", "已丢弃") : (r.shCoeff > 0 ? "" : GSEditorText.T("no SH", "SH なし", "无 SH"));
+                    DrawFusedTableRow(r.name, r.active ? GSEditorText.T("yes", "はい", "是") : GSEditorText.T("no", "いいえ", "否"), $"{r.splats:N0}", r.files.ToString(), r.chunks.ToString(), band.ToString(), shTex, flag, cell);
                 }
             }
         }
 
         void DrawQualityPresetButtons()
         {
-            EditorGUILayout.LabelField(GSEditorText.T("Quality Preset", "品質プリセット"), EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(GSEditorText.T("Quality Preset", "品質プリセット", "画质预设"), EditorStyles.boldLabel);
             using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button(GSEditorText.T("Very Low", "最低"))) ApplyQualityPreset(0.15f, 0.15f);
-                if (GUILayout.Button(GSEditorText.T("Low", "低"))) ApplyQualityPreset(0.07f, 0.1f);
-                if (GUILayout.Button(GSEditorText.T("Medium", "中"))) ApplyQualityPreset(0.04f, 0.04f);
-                if (GUILayout.Button(GSEditorText.T("High", "高"))) ApplyQualityPreset(0.01f, 0.01f);
+                if (GUILayout.Button(GSEditorText.T("Very Low", "最低", "极低"))) ApplyQualityPreset(0.15f, 0.15f);
+                if (GUILayout.Button(GSEditorText.T("Low", "低", "低"))) ApplyQualityPreset(0.07f, 0.1f);
+                if (GUILayout.Button(GSEditorText.T("Medium", "中", "中"))) ApplyQualityPreset(0.04f, 0.04f);
+                if (GUILayout.Button(GSEditorText.T("High", "高", "高"))) ApplyQualityPreset(0.01f, 0.01f);
             }
         }
 

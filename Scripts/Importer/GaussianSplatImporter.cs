@@ -983,8 +983,8 @@ namespace GaussianSplatting
                 for (int bucket = 0; bucket < bucketCount; bucket++)
                 {
                     if (bucketCounts[bucket] <= 0) continue;
-                    EditorUtility.DisplayProgressBar("Import Gaussian Splat PLY",
-                        $"Ordering Hilbert bucket {bucket + 1:N0}/{bucketCount:N0}", 0.25f + 0.55f * (bucket / (float)bucketCount));
+                    EditorUtility.DisplayProgressBar(GSEditorText.T("Import Gaussian Splat PLY", "Gaussian Splat PLY をインポート", "导入 Gaussian Splat PLY"),
+                        GSEditorText.T($"Ordering Hilbert bucket {bucket + 1:N0}/{bucketCount:N0}", $"Hilbert バケット {bucket + 1:N0}/{bucketCount:N0} を順序付け中", $"正在排列 Hilbert 桶 {bucket + 1:N0}/{bucketCount:N0}"), 0.25f + 0.55f * (bucket / (float)bucketCount));
                     StreamedSplatReader.ProcessSortedBucketFile(bucketPaths[bucket], bucketCounts[bucket], bucketBits, tempFolder, keyComparer, consume, bucket + 1, bucketCount);
                 }
                 n = filled;
@@ -1005,8 +1005,8 @@ namespace GaussianSplatting
                     ? ChoosePotTextureLayout(n * importedSHCoeffCount)
                     : new TextureLayout(4, 4);
 
-                EditorUtility.DisplayProgressBar("Import Gaussian Splat PLY",
-                    $"Packing {n:N0} splats into {splatLayout.Width}x{splatLayout.Height} textures", 0.84f);
+                EditorUtility.DisplayProgressBar(GSEditorText.T("Import Gaussian Splat PLY", "Gaussian Splat PLY をインポート", "导入 Gaussian Splat PLY"),
+                    GSEditorText.T($"Packing {n:N0} splats into {splatLayout.Width}x{splatLayout.Height} textures", $"{n:N0} Splat を {splatLayout.Width}x{splatLayout.Height} テクスチャにパック中", $"正在将 {n:N0} 个 Splat 打包为 {splatLayout.Width}x{splatLayout.Height} 纹理"), 0.84f);
 
                 // Bounding box (positions are already fully transformed by the stream).
                 Bounds bbox = new Bounds();
@@ -1613,7 +1613,7 @@ namespace GaussianSplatting.Editor.Importers
 
             protected override GUIContent CreateHeaderContent()
             {
-                return GSEditorText.C("Gaussian Splat Preview", "Gaussian Splat プレビュー");
+                return GSEditorText.C("Gaussian Splat Preview", "Gaussian Splat プレビュー", "Gaussian Splat 预览");
             }
 
             protected override bool OnOpenStage()
@@ -1826,7 +1826,7 @@ namespace GaussianSplatting.Editor.Importers
         public static GaussianSplatImportWizard OpenWithSource(string sourcePath)
         {
             GaussianSplatImportWizard window = GetWindow<GaussianSplatImportWizard>();
-            window.titleContent = GSEditorText.C("Splat Import", "Splat インポート");
+            window.titleContent = GSEditorText.C("Splat Import", "Splat インポート", "导入 Splat");
             window.Show();
             window.Focus();
 
@@ -1901,7 +1901,7 @@ namespace GaussianSplatting.Editor.Importers
         static void Init()
         {
             GaussianSplatImportWizard window = GetWindow<GaussianSplatImportWizard>();
-            window.titleContent = GSEditorText.C("Splat Import", "Splat インポート");
+            window.titleContent = GSEditorText.C("Splat Import", "Splat インポート", "导入 Splat");
             window.Show();
         }
 
@@ -1911,7 +1911,7 @@ namespace GaussianSplatting.Editor.Importers
         {
             if (md == null) return;
             GaussianSplatImportWizard window = GetWindow<GaussianSplatImportWizard>();
-            window.titleContent = GSEditorText.C("Splat Import", "Splat インポート");
+            window.titleContent = GSEditorText.C("Splat Import", "Splat インポート", "导入 Splat");
             window.Show();
             GaussianSplatImporter.ImportOptions o = md.options;
             ImportMode reimportMode = o.standalone ? ImportMode.Standalone : ImportMode.LOD;
@@ -2637,7 +2637,7 @@ namespace GaussianSplatting.Editor.Importers
             {
                 EditorGUILayout.HelpBox(GSEditorText.T(
                     "The source carries no SH coefficients (no f_rest_* properties); this splat will import DC-only regardless of the band.",
-                    "ソースに SH 係数 (f_rest_* プロパティ) がありません。バンド設定に関わらず DC のみでインポートされます。"), MessageType.Warning);
+                    "ソースに SH 係数 (f_rest_* プロパティ) がありません。バンド設定に関わらず DC のみでインポートされます。", "源文件不含 SH 系数（没有 f_rest_* 属性）；无论选择什么阶数，此 Splat 都仅导入 DC 分量。"), MessageType.Warning);
                 return;
             }
 
@@ -2646,7 +2646,8 @@ namespace GaussianSplatting.Editor.Importers
             {
                 EditorGUILayout.HelpBox(GSEditorText.T(
                     $"The source only carries {fileCoeffCount} SH coefficients ({fileBand}); this splat will import at {fileBand}, not {entry.shBand}.",
-                    $"ソースは SH 係数を {fileCoeffCount} 個 ({fileBand}) しか持ちません。{entry.shBand} ではなく {fileBand} でインポートされます。"), MessageType.Warning);
+                    $"ソースは SH 係数を {fileCoeffCount} 個 ({fileBand}) しか持ちません。{entry.shBand} ではなく {fileBand} でインポートされます。",
+                    $"源文件仅包含 {fileCoeffCount} 个 SH 系数（{fileBand}）；此 Splat 将按 {fileBand} 而非 {entry.shBand} 导入。"), MessageType.Warning);
             }
 
             // Combined modes bake SH per stored splat, so the computed-LOD pyramid counts against the cap too.
@@ -2678,9 +2679,16 @@ namespace GaussianSplatting.Editor.Importers
             string lodNoteJa = entry.lodComputeSplats
                 ? $" 計算 LOD により保存数がソースの {estimatedSourceCount:N0} splat を超えています。無効にすると {estimatedSourceCount:N0} が保存されます。"
                 : string.Empty;
+            string outcomeZh = cappedCoeffCount > 0
+                ? $"此 Splat 将改为按 {cappedBand} 导入。"
+                : "当前存储的 Splat 数量下没有符合上限的 SH 阶数，因此只导入 DC 分量。";
+            string lodNoteZh = entry.lodComputeSplats
+                ? $" 计算 LOD 使存储数量超过源文件的 {estimatedSourceCount:N0} 个 Splat；关闭后将存储 {estimatedSourceCount:N0} 个。"
+                : string.Empty;
             EditorGUILayout.HelpBox(GSEditorText.T(
                 $"{GaussianSplatImporter.SHBandForCoeffCount(effectiveCoeffCount)} needs {storedCount:N0} stored splats x {effectiveCoeffCount} coefficients = {shTexels:N0} SH texels, over the import cap of {GaussianSplatImporter.MaxLODImportSHTexels:N0}. {outcomeEn}{lodNoteEn}",
-                $"{GaussianSplatImporter.SHBandForCoeffCount(effectiveCoeffCount)} は 保存 {storedCount:N0} splat x 係数 {effectiveCoeffCount} = SH テクセル {shTexels:N0} を要し、インポート上限 {GaussianSplatImporter.MaxLODImportSHTexels:N0} を超えます。{outcomeJa}{lodNoteJa}"), MessageType.Warning);
+                $"{GaussianSplatImporter.SHBandForCoeffCount(effectiveCoeffCount)} は 保存 {storedCount:N0} splat x 係数 {effectiveCoeffCount} = SH テクセル {shTexels:N0} を要し、インポート上限 {GaussianSplatImporter.MaxLODImportSHTexels:N0} を超えます。{outcomeJa}{lodNoteJa}",
+                $"{GaussianSplatImporter.SHBandForCoeffCount(effectiveCoeffCount)} 需要 {storedCount:N0} 个存储 Splat × {effectiveCoeffCount} 个系数 = {shTexels:N0} 个 SH 纹素，超过导入上限 {GaussianSplatImporter.MaxLODImportSHTexels:N0}。{outcomeZh}{lodNoteZh}"), MessageType.Warning);
         }
 
         string GetComputedLodSplatEstimateLabel(ImportEntry entry)
@@ -2689,7 +2697,7 @@ namespace GaussianSplatting.Editor.Importers
             if (estimatedSourceCount < 0)
             {
                 return GSEditorText.T("Effective stored splat count will be shown after the preview has loaded.",
-                    "プレビュー読み込み後に有効な保存 Splat 数を表示します。");
+                    "プレビュー読み込み後に有効な保存 Splat 数を表示します。", "预览加载完成后将显示实际存储的 Splat 数量。");
             }
 
             int resamplePercent = NormalizeLODResamplePercent(entry.lodResamplePercent);
@@ -2699,7 +2707,10 @@ namespace GaussianSplatting.Editor.Importers
             int lodSplatCount = Mathf.Max(0, storedCount - resampledLod0Count);
             float sourceMultiplier = estimatedSourceCount > 0 ? storedCount / (float)estimatedSourceCount : 0.0f;
             float lod0Multiplier = estimatedSourceCount > 0 ? resampledLod0Count / (float)estimatedSourceCount : 0.0f;
-            return $"Estimated splats: source {estimatedSourceCount:N0}, LOD0 {resampledLod0Count:N0} ({resamplePercent}%, {lod0Multiplier:0.00}x), computed LOD {lodSplatCount:N0}, stored {storedCount:N0} ({sourceMultiplier:0.00}x source, {reusePercent}% reused)";
+            return GSEditorText.T(
+                $"Estimated splats: source {estimatedSourceCount:N0}, LOD0 {resampledLod0Count:N0} ({resamplePercent}%, {lod0Multiplier:0.00}x), computed LOD {lodSplatCount:N0}, stored {storedCount:N0} ({sourceMultiplier:0.00}x source, {reusePercent}% reused)",
+                $"推定 Splat 数: ソース {estimatedSourceCount:N0}、LOD0 {resampledLod0Count:N0} ({resamplePercent}%、{lod0Multiplier:0.00}倍)、計算 LOD {lodSplatCount:N0}、保存 {storedCount:N0} (ソースの {sourceMultiplier:0.00}倍、{reusePercent}% 再利用)",
+                $"预计 Splat 数量：源文件 {estimatedSourceCount:N0}，LOD0 {resampledLod0Count:N0}（{resamplePercent}%，{lod0Multiplier:0.00} 倍），计算 LOD {lodSplatCount:N0}，存储 {storedCount:N0}（源文件的 {sourceMultiplier:0.00} 倍，复用 {reusePercent}%）");
         }
 
         static int EstimateStoredLodSplatCount(int splatCount, int chunkSize, bool computeLodSplats)
@@ -2984,10 +2995,10 @@ namespace GaussianSplatting.Editor.Importers
             }
 
             EditorGUILayout.Space(8f);
-            EditorGUILayout.LabelField(GSEditorText.T("Selected Splat", "選択中の Splat"), EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(GSEditorText.T("Selected Splat", "選択中の Splat", "选中的 Splat"), EditorStyles.boldLabel);
             using (new EditorGUI.DisabledScope(_previewTask != null && !_previewTask.IsCompleted))
             {
-                if (GUILayout.Button(GSEditorText.T("Reload Preview", "プレビューを再読み込み")))
+                if (GUILayout.Button(GSEditorText.T("Reload Preview", "プレビューを再読み込み", "重新加载预览")))
                 {
                     _framePreviewOnLoad = true;
                     StartPreviewLoad(entry.path);
@@ -3006,7 +3017,7 @@ namespace GaussianSplatting.Editor.Importers
                 }
                 else
                 {
-                    EditorGUILayout.HelpBox(GSEditorText.T("Loading preview asynchronously...", "プレビューを非同期で読み込み中..."), MessageType.Info);
+                    EditorGUILayout.HelpBox(GSEditorText.T("Loading preview asynchronously...", "プレビューを非同期で読み込み中...", "正在异步加载预览..."), MessageType.Info);
                 }
             }
             else if (_previewData != null && _previewData.positions != null)
@@ -3015,25 +3026,25 @@ namespace GaussianSplatting.Editor.Importers
             }
             using (new EditorGUI.DisabledScope(_previewMesh == null || _previewMaterial == null))
             {
-                if (GUILayout.Button(GSEditorText.T("Open Isolated Preview Stage", "隔離プレビューステージを開く")))
+                if (GUILayout.Button(GSEditorText.T("Open Isolated Preview Stage", "隔離プレビューステージを開く", "打开独立的预览场景")))
                 {
                     OpenPreviewStage(true);
                 }
             }
-            if (_previewStage != null && GUILayout.Button(GSEditorText.T("Close Preview Stage", "プレビューステージを閉じる")))
+            if (_previewStage != null && GUILayout.Button(GSEditorText.T("Close Preview Stage", "プレビューステージを閉じる", "关闭预览场景")))
             {
                 ClosePreviewStage();
             }
             EditorGUILayout.HelpBox(GSEditorText.T(
                 "The preview stage uses temporary editor objects only. Use Scene View move/scale tools on Crop Bounds to edit the import crop.",
-                "プレビューステージは一時的なエディターオブジェクトのみを使用します。Scene ビューの移動/スケールツールで Crop Bounds を編集できます。"), MessageType.Info);
+                "プレビューステージは一時的なエディターオブジェクトのみを使用します。Scene ビューの移動/スケールツールで Crop Bounds を編集できます。", "预览场景仅使用临时编辑器对象。请在场景视图中使用移动或缩放工具调整 Crop Bounds，以编辑导入裁剪区域。"), MessageType.Info);
 
             EditorGUI.BeginChangeCheck();
-            entry.cropToBounds = EditorGUILayout.Toggle(GSEditorText.T("Crop To Bounds", "境界でクロップ"), entry.cropToBounds);
+            entry.cropToBounds = EditorGUILayout.Toggle(GSEditorText.T("Crop To Bounds", "境界でクロップ", "按边界裁剪"), entry.cropToBounds);
             using (new EditorGUI.DisabledScope(!entry.cropToBounds))
             {
-                entry.cropBounds.center = EditorGUILayout.Vector3Field(GSEditorText.T("Crop Center", "クロップ中心"), entry.cropBounds.center);
-                entry.cropBounds.size = Vector3.Max(Vector3.one * 0.0001f, EditorGUILayout.Vector3Field(GSEditorText.T("Crop Size", "クロップサイズ"), entry.cropBounds.size));
+                entry.cropBounds.center = EditorGUILayout.Vector3Field(GSEditorText.T("Crop Center", "クロップ中心", "裁剪中心"), entry.cropBounds.center);
+                entry.cropBounds.size = Vector3.Max(Vector3.one * 0.0001f, EditorGUILayout.Vector3Field(GSEditorText.T("Crop Size", "クロップサイズ", "裁剪大小"), entry.cropBounds.size));
             }
             string cropEstimateLabel = GetCropEstimateLabel(entry);
             if (!string.IsNullOrEmpty(cropEstimateLabel))
@@ -3046,9 +3057,9 @@ namespace GaussianSplatting.Editor.Importers
             }
 
             EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField(GSEditorText.T("Horizon Alignment", "水平線合わせ"), EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(GSEditorText.T("Horizon Alignment", "水平線合わせ", "水平线对齐"), EditorStyles.boldLabel);
             EditorGUI.BeginChangeCheck();
-            entry.horizonPickMode = EditorGUILayout.Toggle(GSEditorText.T("Pick Horizon Points", "水平点を選択"), entry.horizonPickMode);
+            entry.horizonPickMode = EditorGUILayout.Toggle(GSEditorText.T("Pick Horizon Points", "水平点を選択", "选取水平线点"), entry.horizonPickMode);
             if (EditorGUI.EndChangeCheck())
             {
                 if (entry.horizonPickMode)
@@ -3057,11 +3068,11 @@ namespace GaussianSplatting.Editor.Importers
                     if (_previewMesh != null && _previewMaterial != null) OpenPreviewStage(true);
                 }
             }
-            EditorGUILayout.LabelField(GSEditorText.T("Picked Points", "選択点"), entry.horizonPoints.Count.ToString());
+            EditorGUILayout.LabelField(GSEditorText.T("Picked Points", "選択点", "已选点"), entry.horizonPoints.Count.ToString());
             EditorGUILayout.BeginHorizontal();
             using (new EditorGUI.DisabledScope(entry.horizonPoints.Count == 0))
             {
-                if (GUILayout.Button(GSEditorText.T("Clear Points", "点をクリア")))
+                if (GUILayout.Button(GSEditorText.T("Clear Points", "点をクリア", "清除点")))
                 {
                     entry.horizonPoints.Clear();
                     SceneView.RepaintAll();
@@ -3069,14 +3080,14 @@ namespace GaussianSplatting.Editor.Importers
             }
             using (new EditorGUI.DisabledScope(entry.horizonPoints.Count < 3))
             {
-                if (GUILayout.Button(GSEditorText.T("Apply Alignment", "合わせを適用")))
+                if (GUILayout.Button(GSEditorText.T("Apply Alignment", "合わせを適用", "应用对齐")))
                 {
                     ApplyHorizonAlignment(entry);
                 }
             }
             using (new EditorGUI.DisabledScope(!entry.applyHorizonAlignment))
             {
-                if (GUILayout.Button(GSEditorText.T("Reset Alignment", "合わせをリセット")))
+                if (GUILayout.Button(GSEditorText.T("Reset Alignment", "合わせをリセット", "重置对齐")))
                 {
                     ResetHorizonAlignment(entry);
                 }
@@ -3084,7 +3095,7 @@ namespace GaussianSplatting.Editor.Importers
             EditorGUILayout.EndHorizontal();
 
             EditorGUI.BeginChangeCheck();
-            entry.wallPickMode = EditorGUILayout.Toggle(GSEditorText.T("Pick Wall Points", "壁点を選択"), entry.wallPickMode);
+            entry.wallPickMode = EditorGUILayout.Toggle(GSEditorText.T("Pick Wall Points", "壁点を選択", "选取墙面点"), entry.wallPickMode);
             if (EditorGUI.EndChangeCheck())
             {
                 if (entry.wallPickMode)
@@ -3093,11 +3104,11 @@ namespace GaussianSplatting.Editor.Importers
                     if (_previewMesh != null && _previewMaterial != null) OpenPreviewStage(true);
                 }
             }
-            EditorGUILayout.LabelField(GSEditorText.T("Picked Wall Points", "選択した壁点"), entry.wallPoints.Count.ToString());
+            EditorGUILayout.LabelField(GSEditorText.T("Picked Wall Points", "選択した壁点", "已选墙面点"), entry.wallPoints.Count.ToString());
             EditorGUILayout.BeginHorizontal();
             using (new EditorGUI.DisabledScope(entry.wallPoints.Count == 0))
             {
-                if (GUILayout.Button(GSEditorText.T("Clear Wall Points", "壁点をクリア")))
+                if (GUILayout.Button(GSEditorText.T("Clear Wall Points", "壁点をクリア", "清除墙面点")))
                 {
                     entry.wallPoints.Clear();
                     SceneView.RepaintAll();
@@ -3105,14 +3116,14 @@ namespace GaussianSplatting.Editor.Importers
             }
             using (new EditorGUI.DisabledScope(!entry.applyHorizonAlignment || entry.wallPoints.Count < 3))
             {
-                if (GUILayout.Button(GSEditorText.T("Apply Wall", "壁合わせを適用")))
+                if (GUILayout.Button(GSEditorText.T("Apply Wall", "壁合わせを適用", "应用墙面对齐")))
                 {
                     ApplyWallAlignment(entry);
                 }
             }
             using (new EditorGUI.DisabledScope(!entry.applyWallAlignment))
             {
-                if (GUILayout.Button(GSEditorText.T("Reset Wall", "壁合わせをリセット")))
+                if (GUILayout.Button(GSEditorText.T("Reset Wall", "壁合わせをリセット", "重置墙面对齐")))
                 {
                     ResetWallAlignment(entry);
                 }
@@ -3124,36 +3135,37 @@ namespace GaussianSplatting.Editor.Importers
             // splats stay a self-rendering mesh + material with no component. The mode drives the derived flags
             // read below (standalone / importAsLOD / lodComputeSplats), and gates which settings are shown.
             EditorGUILayout.Space(6f);
-            entry.importMode = (ImportMode)EditorGUILayout.EnumPopup(GSEditorText.T("Import Mode", "インポートモード"), entry.importMode);
+            entry.importMode = (ImportMode)EditorGUILayout.Popup(GSEditorText.T("Import Mode", "インポートモード", "导入模式"), (int)entry.importMode,
+                new[] { "LOD", GSEditorText.T("Standalone", "スタンドアロン", "独立渲染") });
             switch (entry.importMode)
             {
                 case ImportMode.LOD:
                     EditorGUILayout.HelpBox(GSEditorText.T(
                         "Combined GaussianSplatObject with a downsampled LOD pyramid; the combiner selects detail by distance and budget.",
-                        "ダウンサンプリングした LOD ピラミッドを持つ統合 GaussianSplatObject。combiner が距離と予算に応じて詳細度を選択します。"), MessageType.Info);
+                        "ダウンサンプリングした LOD ピラミッドを持つ統合 GaussianSplatObject。combiner が距離と予算に応じて詳細度を選択します。", "合并的 GaussianSplatObject，带有下采样的 LOD 金字塔；合并器根据距离和预算选择细节级别。"), MessageType.Info);
                     break;
                 case ImportMode.Standalone:
                     EditorGUILayout.HelpBox(GSEditorText.T(
                         "Precomputes sorting for octahedral directions so the splat renders on its own, without the GaussianSplatRenderer/combiner. Uses much more texture memory and may show rendering artifacts.",
-                        "八面体方向のソートを事前計算し、GaussianSplatRenderer/combiner なしで Splat を単独描画します。テクスチャメモリを大幅に多く使用し、描画アーティファクトが出る場合があります。"), MessageType.Warning);
+                        "八面体方向のソートを事前計算し、GaussianSplatRenderer/combiner なしで Splat を単独描画します。テクスチャメモリを大幅に多く使用し、描画アーティファクトが出る場合があります。", "预先计算八面体方向的排序，使 Splat 无需 GaussianSplatRenderer 或合并器即可独立渲染。此模式占用更多纹理内存，且可能出现渲染瑕疵。"), MessageType.Warning);
                     break;
             }
             ApplyImportModeFlags(entry);
 
             EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField(GSEditorText.T("Splat Settings", "Splat 設定"), EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(GSEditorText.T("Splat Settings", "Splat 設定", "Splat 设置"), EditorStyles.boldLabel);
             EditorGUI.indentLevel++;
 
             // Combined-object settings (LOD and Normal modes). Chunking and packed positions apply to both;
             // the resampling controls only matter for the LOD pyramid.
             if (entry.importAsLOD)
             {
-                entry.lodChunkSize = Mathf.Max(1, EditorGUILayout.IntField(GSEditorText.T("Chunk Size", "チャンクサイズ"), entry.lodChunkSize));
-                entry.lodUsePackedPositions = EditorGUILayout.Toggle(GSEditorText.T("Pack Positions", "位置をパック"), entry.lodUsePackedPositions);
+                entry.lodChunkSize = Mathf.Max(1, EditorGUILayout.IntField(GSEditorText.T("Chunk Size", "チャンクサイズ", "分块大小"), entry.lodChunkSize));
+                entry.lodUsePackedPositions = EditorGUILayout.Toggle(GSEditorText.T("Pack Positions", "位置をパック", "打包位置"), entry.lodUsePackedPositions);
                 if (entry.lodComputeSplats)
                 {
-                    entry.lodResamplePercent = EditorGUILayout.IntSlider(GSEditorText.T("LOD Resampling Rate", "LOD リサンプリング率"), NormalizeLODResamplePercent(entry.lodResamplePercent), 1, DefaultLODResamplePercent);
-                    entry.lodReusePercent = EditorGUILayout.IntSlider(GSEditorText.T("LOD Reused Splats", "LOD 再利用 Splat"), NormalizeLODReusePercent(entry.lodReusePercent), 1, 99);
+                    entry.lodResamplePercent = EditorGUILayout.IntSlider(GSEditorText.T("LOD Resampling Rate", "LOD リサンプリング率", "LOD 重采样比例"), NormalizeLODResamplePercent(entry.lodResamplePercent), 1, DefaultLODResamplePercent);
+                    entry.lodReusePercent = EditorGUILayout.IntSlider(GSEditorText.T("LOD Reused Splats", "LOD 再利用 Splat", "LOD 复用 Splat"), NormalizeLODReusePercent(entry.lodReusePercent), 1, 99);
                     EditorGUILayout.LabelField(GetComputedLodSplatEstimateLabel(entry), EditorStyles.wordWrappedMiniLabel);
                 }
             }
@@ -3161,76 +3173,76 @@ namespace GaussianSplatting.Editor.Importers
             // Common geometry transforms — apply to both LOD and non-LOD (the streamed front-end bakes them
             // identically into either output, so they are not LOD-specific). (The y-flip is always baked into
             // coordinates -> identity prefab scale; there is no negative-scale option.)
-            entry.normalizeSize = EditorGUILayout.Toggle(GSEditorText.T("Normalize Size", "サイズを正規化"), entry.normalizeSize);
+            entry.normalizeSize = EditorGUILayout.Toggle(GSEditorText.T("Normalize Size", "サイズを正規化", "归一化大小"), entry.normalizeSize);
             if (entry.normalizeSize)
             {
-                entry.normalizeTargetSize = Mathf.Max(0.0001f, EditorGUILayout.FloatField(GSEditorText.T("Target Size", "目標サイズ"), entry.normalizeTargetSize));
+                entry.normalizeTargetSize = Mathf.Max(0.0001f, EditorGUILayout.FloatField(GSEditorText.T("Target Size", "目標サイズ", "目标大小"), entry.normalizeTargetSize));
             }
 
             // Spherical harmonics (both LOD and non-LOD), with its compression in the same place.
-            entry.importSphericalHarmonics = EditorGUILayout.Toggle(GSEditorText.T("Import Spherical Harmonics", "球面調和をインポート"), entry.importSphericalHarmonics);
+            entry.importSphericalHarmonics = EditorGUILayout.Toggle(GSEditorText.T("Import Spherical Harmonics", "球面調和をインポート", "导入球谐函数"), entry.importSphericalHarmonics);
             if (entry.importSphericalHarmonics)
             {
-                entry.shBand = (SHBand)EditorGUILayout.EnumPopup(GSEditorText.T("Max SH Band", "最大 SH バンド"), entry.shBand);
+                entry.shBand = (SHBand)EditorGUILayout.EnumPopup(GSEditorText.T("Max SH Band", "最大 SH バンド", "最大 SH 阶数"), entry.shBand);
                 EditorGUILayout.HelpBox(GSEditorText.T(
                     "Imports higher-order SH coefficient textures only up to the selected max band and sets the imported material to that band. If the selected band has no non-zero coefficients in the file, the importer falls back to the highest lower non-zero band.",
-                    "選択した最大バンドまでの高次 SH 係数テクスチャだけをインポートし、インポートされたマテリアルをそのバンドに設定します。選択したバンドに非ゼロ係数がない場合は、より低い非ゼロの最大バンドにフォールバックします。"), MessageType.Info);
+                    "選択した最大バンドまでの高次 SH 係数テクスチャだけをインポートし、インポートされたマテリアルをそのバンドに設定します。選択したバンドに非ゼロ係数がない場合は、より低い非ゼロの最大バンドにフォールバックします。", "仅导入所选最大阶数以内的高阶 SH 系数纹理，并将导入材质设为该阶数。如果文件中所选阶数没有非零系数，导入器将回退到较低的最高非零阶数。"), MessageType.Info);
                 DrawSHLimitWarnings(entry);
-                entry.shCompression = (GaussianSplatImporter.SHCompression)EditorGUILayout.IntPopup(GSEditorText.C("SH Compression", "SH 圧縮"), (int)entry.shCompression, ShFormatLabels, ShFormatValues);
+                entry.shCompression = (GaussianSplatImporter.SHCompression)EditorGUILayout.IntPopup(GSEditorText.C("SH Compression", "SH 圧縮", "SH 压缩"), (int)entry.shCompression, ShFormatLabels, ShFormatValues);
                 EditorGUILayout.HelpBox(GSEditorText.T(
                     "SH texture format: RGBA32 = 32bpp, RGB565 = 16bpp, BC7 = 8bpp, BC1 = 4bpp. RGB565 and BC compression are lossy. LOD scene fusion uses BC7 regardless of this setting. (LOD only: the import steps down to the highest band that fits its SH cap, and the scene's fused SH must fit one texture; objects past that fall back to DC.)",
-                    "SH テクスチャ形式: RGBA32 = 32bpp、RGB565 = 16bpp、BC7 = 8bpp、BC1 = 4bpp。RGB565 と BC 圧縮は不可逆です。LOD のシーン統合では、この設定にかかわらず BC7 を使用します。(LOD のみ: インポートは SH 上限に収まる最大バンドまで自動的に下げられ、さらにシーン全体の統合 SH は 1 テクスチャに収まる必要があります。超過するオブジェクトは DC にフォールバックします。)"), MessageType.Info);
+                    "SH テクスチャ形式: RGBA32 = 32bpp、RGB565 = 16bpp、BC7 = 8bpp、BC1 = 4bpp。RGB565 と BC 圧縮は不可逆です。LOD のシーン統合では、この設定にかかわらず BC7 を使用します。(LOD のみ: インポートは SH 上限に収まる最大バンドまで自動的に下げられ、さらにシーン全体の統合 SH は 1 テクスチャに収まる必要があります。超過するオブジェクトは DC にフォールバックします。)", "SH 纹理格式：RGBA32 = 32bpp、RGB565 = 16bpp、BC7 = 8bpp、BC1 = 4bpp。RGB565 和 BC 压缩均为有损压缩。LOD 场景融合始终使用 BC7。（仅 LOD：导入时会降低至符合 SH 上限的最高阶数；场景融合后的 SH 必须放入一张纹理，超出上限的对象将回退到 DC。）"), MessageType.Info);
             }
             else
             {
                 EditorGUILayout.HelpBox(GSEditorText.T(
                     "Skips SH coefficient texture generation and forces imported materials to SH0 only.",
-                    "SH 係数テクスチャの生成をスキップし、インポートされたマテリアルを SH0 のみにします。"), MessageType.Info);
+                    "SH 係数テクスチャの生成をスキップし、インポートされたマテリアルを SH0 のみにします。", "跳过 SH 系数纹理生成，并将导入材质强制设为 SH0。"), MessageType.Info);
             }
 
-            entry.computeBoundingBox = EditorGUILayout.Toggle(GSEditorText.T("Compute Bounding Box", "バウンディングボックスを計算"), entry.computeBoundingBox);
+            entry.computeBoundingBox = EditorGUILayout.Toggle(GSEditorText.T("Compute Bounding Box", "バウンディングボックスを計算", "计算包围盒"), entry.computeBoundingBox);
 
             // Color/alpha texture compression — common to both paths (both outputs have a color texture).
-            entry.compressColorAlphaToBC7 = EditorGUILayout.Toggle(GSEditorText.T("Compress ColorAlpha (BC7)", "色アルファを圧縮 (BC7)"), entry.compressColorAlphaToBC7);
+            entry.compressColorAlphaToBC7 = EditorGUILayout.Toggle(GSEditorText.T("Compress ColorAlpha (BC7)", "色アルファを圧縮 (BC7)", "压缩颜色和 Alpha（BC7）"), entry.compressColorAlphaToBC7);
             if (entry.compressColorAlphaToBC7 || (entry.importSphericalHarmonics && (entry.shCompression == GaussianSplatImporter.SHCompression.BC1 || entry.shCompression == GaussianSplatImporter.SHCompression.BC7)))
             {
                 EditorGUILayout.HelpBox(GSEditorText.T(
                     "The importer always packs generated splat textures into 4x4-aligned blocks. Compression applies only to the color/alpha and SH textures; position, scale, and sorting textures stay uncompressed.",
-                    "インポーターは生成される Splat テクスチャを常に 4x4 境界に合わせたブロックに詰めます。圧縮は色アルファと SH テクスチャにのみ適用され、位置・スケール・ソートテクスチャは非圧縮のままです。"), MessageType.Info);
+                    "インポーターは生成される Splat テクスチャを常に 4x4 境界に合わせたブロックに詰めます。圧縮は色アルファと SH テクスチャにのみ適用され、位置・スケール・ソートテクスチャは非圧縮のままです。", "导入器始终将生成的 Splat 纹理打包为按 4×4 对齐的块。压缩仅用于颜色/Alpha 和 SH 纹理；位置、缩放及排序纹理保持未压缩。"), MessageType.Info);
             }
 
             // Standalone rendering settings (not used by combined GaussianSplatObject splats, which render
             // via the combiner).
             if (!entry.importAsLOD)
             {
-                entry.useSRGB = EditorGUILayout.Toggle(GSEditorText.T("sRGB Color Correction", "sRGB 色補正"), entry.useSRGB);
+                entry.useSRGB = EditorGUILayout.Toggle(GSEditorText.T("sRGB Color Correction", "sRGB 色補正", "sRGB 颜色校正"), entry.useSRGB);
                 EditorGUILayout.HelpBox(GSEditorText.T(
                     "Color correction requires 2 additional grab passes, for small splats you might want to disable this. Without this enabled back to front rendering will be used, which makes multi-pass rendering not work. sRGB color correction only works correctly if the world has HDR camera render targets.",
-                    "色補正には追加で 2 回の Grab パスが必要です。小さな Splat では無効にした方がよい場合があります。これを有効にしない場合は後ろから前への描画になり、マルチパス描画は機能しません。sRGB 色補正は、ワールドのカメラレンダーターゲットが HDR の場合にのみ正しく動作します。"), MessageType.Info);
+                    "色補正には追加で 2 回の Grab パスが必要です。小さな Splat では無効にした方がよい場合があります。これを有効にしない場合は後ろから前への描画になり、マルチパス描画は機能しません。sRGB 色補正は、ワールドのカメラレンダーターゲットが HDR の場合にのみ正しく動作します。", "颜色校正需要额外的 2 次 Grab Pass。对于较小的 Splat，建议考虑关闭。关闭后将使用从后向前渲染，导致多 Pass 渲染无法工作。sRGB 颜色校正仅在世界使用 HDR 相机渲染目标时才能正常工作。"), MessageType.Info);
                 if (entry.useSRGB)
                 {
-                    entry.multiPassRendering = EditorGUILayout.Toggle(GSEditorText.T("Multi-Pass Rendering", "マルチパス描画"), entry.multiPassRendering);
+                    entry.multiPassRendering = EditorGUILayout.Toggle(GSEditorText.T("Multi-Pass Rendering", "マルチパス描画", "多 Pass 渲染"), entry.multiPassRendering);
                     if (entry.multiPassRendering)
                     {
-                        entry.splatsPerPass = Mathf.Clamp(EditorGUILayout.IntField(GSEditorText.T("Splat Count Per Pass", "パスごとの Splat 数"), entry.splatsPerPass), 128 * 1024, 8 * 1024 * 1024);
+                        entry.splatsPerPass = Mathf.Clamp(EditorGUILayout.IntField(GSEditorText.T("Splat Count Per Pass", "パスごとの Splat 数", "每个 Pass 的 Splat 数量"), entry.splatsPerPass), 128 * 1024, 8 * 1024 * 1024);
                         EditorGUILayout.HelpBox(GSEditorText.T(
                             "The rendering of the splat is split into multiple sequential chunks, can help with VR rendering performance.",
-                            "Splat の描画を複数の連続チャンクに分割します。VR 描画性能の改善に役立つ場合があります。"), MessageType.Info);
-                        entry.maxAlphaMaskCount = Mathf.Max(0, EditorGUILayout.IntField(GSEditorText.T("Max Alpha Mask Count", "最大アルファマスク数"), entry.maxAlphaMaskCount));
+                            "Splat の描画を複数の連続チャンクに分割します。VR 描画性能の改善に役立つ場合があります。", "将 Splat 渲染拆分为多个顺序执行的块，有助于提升 VR 渲染性能。"), MessageType.Info);
+                        entry.maxAlphaMaskCount = Mathf.Max(0, EditorGUILayout.IntField(GSEditorText.T("Max Alpha Mask Count", "最大アルファマスク数", "最大 Alpha 遮罩次数"), entry.maxAlphaMaskCount));
                         EditorGUILayout.HelpBox(GSEditorText.T(
                             "After each chunk is rendered an optional alpha mask pass is added using a grab pass and stencil. This will occlude the following chunks if they are behind opaque objects. This can help performance, but grab pass can be expensive, so use it with care. If you have more than 4M splats you might want to have more than 1 alpha mask pass.",
-                            "各チャンクの描画後に、Grab パスとステンシルを使った任意のアルファマスクパスを追加します。不透明オブジェクトの背後にある後続チャンクを遮蔽できます。性能改善に役立つ場合がありますが、Grab パスは高コストなので注意してください。400 万を超える Splat では、アルファマスクパスを 2 つ以上にした方がよい場合があります。"), MessageType.Info);
+                            "各チャンクの描画後に、Grab パスとステンシルを使った任意のアルファマスクパスを追加します。不透明オブジェクトの背後にある後続チャンクを遮蔽できます。性能改善に役立つ場合がありますが、Grab パスは高コストなので注意してください。400 万を超える Splat では、アルファマスクパスを 2 つ以上にした方がよい場合があります。", "每个块渲染后，可使用 Grab Pass 和模板测试添加 Alpha 遮罩 Pass，遮挡位于不透明对象后方的后续块。这可能改善性能，但 Grab Pass 开销较大，请谨慎使用。如果 Splat 超过 400 万，可以考虑使用多个 Alpha 遮罩 Pass。"), MessageType.Info);
                     }
                 }
-                entry.startRenderQueue = Mathf.Clamp(EditorGUILayout.IntField(GSEditorText.T("Start Render Queue", "開始レンダーキュー"), entry.startRenderQueue), 2000, 5000);
+                entry.startRenderQueue = Mathf.Clamp(EditorGUILayout.IntField(GSEditorText.T("Start Render Queue", "開始レンダーキュー", "起始渲染队列"), entry.startRenderQueue), 2000, 5000);
                 EditorGUILayout.HelpBox(GSEditorText.T(
                     "Starting render queue for the generated splat materials. Each generated material is assigned a sequential queue from this value.",
-                    "生成される Splat マテリアルの開始レンダーキューです。各マテリアルにはこの値から順番にキューが割り当てられます。"), MessageType.Info);
+                    "生成される Splat マテリアルの開始レンダーキューです。各マテリアルにはこの値から順番にキューが割り当てられます。", "生成的 Splat 材质使用的起始渲染队列。每个生成的材质将从此值开始依次分配队列。"), MessageType.Info);
             }
             EditorGUI.indentLevel--;
 
             EditorGUILayout.Space(4f);
-            if (GUILayout.Button(GSEditorText.T("Copy These Settings To All Splats", "この設定を全 Splat にコピー")))
+            if (GUILayout.Button(GSEditorText.T("Copy These Settings To All Splats", "この設定を全 Splat にコピー", "将这些设置复制到所有 Splat")))
             {
                 CopyEntrySettingsToAll(entry);
             }
@@ -3270,8 +3282,8 @@ namespace GaussianSplatting.Editor.Importers
         {
             PollPreviewLoad();
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
-            EditorGUILayout.LabelField(GSEditorText.T("Splat files", "Splat ファイル"), EditorStyles.boldLabel);
-            if (GUILayout.Button(GSEditorText.T("Clear All Files", "すべてのファイルをクリア")))
+            EditorGUILayout.LabelField(GSEditorText.T("Splat files", "Splat ファイル", "Splat 文件"), EditorStyles.boldLabel);
+            if (GUILayout.Button(GSEditorText.T("Clear All Files", "すべてのファイルをクリア", "清除所有文件")))
             {
                 _entries.Clear();
                 _selectedEntryIndex = -1;
@@ -3295,7 +3307,7 @@ namespace GaussianSplatting.Editor.Importers
                 }
                 if (GUILayout.Button("…", GUILayout.Width(30)))
                 {
-                    string path = EditorUtility.OpenFilePanelWithFilters(GSEditorText.T("Select Splat File", "Splat ファイルを選択"), Application.dataPath, GaussianSplatImporter.ImportFilePanelFilters);
+                    string path = EditorUtility.OpenFilePanelWithFilters(GSEditorText.T("Select Splat File", "Splat ファイルを選択", "选择 Splat 文件"), Application.dataPath, GaussianSplatImporter.ImportFilePanelFilters);
                     if (!string.IsNullOrEmpty(path))
                     {
                         entry.path = path;
@@ -3319,10 +3331,10 @@ namespace GaussianSplatting.Editor.Importers
                 EditorGUILayout.EndHorizontal();
             }
             EditorGUILayout.EndVertical();
-            if (GUILayout.Button(GSEditorText.T("+ Add Splat File", "+ Splat ファイルを追加"))) AddEntry();
-            if (GUILayout.Button(GSEditorText.T("Add All Splats in Folder", "フォルダ内の Splat をすべて追加")))
+            if (GUILayout.Button(GSEditorText.T("+ Add Splat File", "+ Splat ファイルを追加", "+ 添加 Splat 文件"))) AddEntry();
+            if (GUILayout.Button(GSEditorText.T("Add All Splats in Folder", "フォルダ内の Splat をすべて追加", "添加文件夹中的所有 Splat")))
             {
-                string folder = EditorUtility.OpenFolderPanel(GSEditorText.T("Select Folder with Splat Files", "Splat ファイルのあるフォルダを選択"), Application.dataPath, "");
+                string folder = EditorUtility.OpenFolderPanel(GSEditorText.T("Select Folder with Splat Files", "Splat ファイルのあるフォルダを選択", "选择包含 Splat 文件的文件夹"), Application.dataPath, "");
                 if (!string.IsNullOrEmpty(folder))
                 {
                     string[] files = Directory.GetFiles(folder, "*.*")
@@ -3342,23 +3354,23 @@ namespace GaussianSplatting.Editor.Importers
 
             EditorGUILayout.HelpBox(GSEditorText.T(
                 "Large imports still depend on available RAM, but the importer streams vertex data so file size is no longer capped by a 2GB raw read buffer. SH import memory still scales with the selected SH band.",
-                "大きなインポートは引き続き使用可能な RAM に依存しますが、インポーターは頂点データをストリーミングするため、ファイルサイズは 2GB の生読み込みバッファに制限されなくなりました。SH インポートのメモリ使用量は選択した SH バンドに応じて増えます。"), MessageType.Info);
+                "大きなインポートは引き続き使用可能な RAM に依存しますが、インポーターは頂点データをストリーミングするため、ファイルサイズは 2GB の生読み込みバッファに制限されなくなりました。SH インポートのメモリ使用量は選択した SH バンドに応じて増えます。", "大型导入仍受可用内存限制，但导入器以流式方式读取顶点数据，文件大小不再受 2GB 原始读取缓冲区限制。SH 导入所需内存仍随所选 SH 阶数增加。"), MessageType.Info);
 
             DrawSelectedEntrySettings();
 
             EditorGUILayout.Space(10);
-            EditorGUILayout.LabelField(GSEditorText.T("Output Folder", "出力フォルダ"), EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(GSEditorText.T("Output Folder", "出力フォルダ", "输出文件夹"), EditorStyles.boldLabel);
             _outputFolder = EditorGUILayout.TextField(_outputFolder);
             if (GUILayout.Button("…", GUILayout.Width(30)))
-                _outputFolder = EditorUtility.OpenFolderPanel(GSEditorText.T("Select Output Folder", "出力フォルダを選択"), _outputFolder, "");
+                _outputFolder = EditorUtility.OpenFolderPanel(GSEditorText.T("Select Output Folder", "出力フォルダを選択", "选择输出文件夹"), _outputFolder, "");
 
             GUILayout.FlexibleSpace();
 
-            if (GUILayout.Button(GSEditorText.T("Import All Splats", "すべての Splat をインポート")))
+            if (GUILayout.Button(GSEditorText.T("Import All Splats", "すべての Splat をインポート", "导入所有 Splat")))
             {
                 if (!_entries.Any(e => !string.IsNullOrEmpty(e.path)))
                 {
-                    EditorUtility.DisplayDialog(GSEditorText.T("Splat Import", "Splat インポート"), GSEditorText.T("Add at least one supported splat path.", "対応する Splat パスを少なくとも 1 つ追加してください。"), "OK");
+                    EditorUtility.DisplayDialog(GSEditorText.T("Splat Import", "Splat インポート", "导入 Splat"), GSEditorText.T("Add at least one supported splat path.", "対応する Splat パスを少なくとも 1 つ追加してください。", "请至少添加一个受支持的 Splat 文件路径。"), "OK");
                     return;
                 }
 
@@ -3374,7 +3386,7 @@ namespace GaussianSplatting.Editor.Importers
                 }
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
-                EditorUtility.DisplayDialog(GSEditorText.T("Splat Import", "Splat インポート"), GSEditorText.T("All imports completed.", "すべてのインポートが完了しました。"), "OK");
+                EditorUtility.DisplayDialog(GSEditorText.T("Splat Import", "Splat インポート", "导入 Splat"), GSEditorText.T("All imports completed.", "すべてのインポートが完了しました。", "所有导入均已完成。"), "OK");
             }
             EditorGUILayout.EndScrollView();
         }
@@ -3384,8 +3396,8 @@ namespace GaussianSplatting.Editor.Importers
             try
             {
                 string sourcePath = entry.path;
-                EditorUtility.DisplayProgressBar(GSEditorText.T("Splat Import", "Splat インポート"),
-                    GSEditorText.T($"Importing {Path.GetFileName(sourcePath)}", $"{Path.GetFileName(sourcePath)} をインポート中"), 0f);
+                EditorUtility.DisplayProgressBar(GSEditorText.T("Splat Import", "Splat インポート", "导入 Splat"),
+                    GSEditorText.T($"Importing {Path.GetFileName(sourcePath)}", $"{Path.GetFileName(sourcePath)} をインポート中", $"正在导入 {Path.GetFileName(sourcePath)}"), 0f);
                 GaussianSplatImporter.ImportOptions options = GetEntryOptions(entry);
                 if (entry.importAsLOD)
                 {
@@ -3398,7 +3410,7 @@ namespace GaussianSplatting.Editor.Importers
             }
             catch (Exception e)
             {
-                EditorUtility.DisplayDialog(GSEditorText.T("Splat Import Failed", "Splat インポート失敗"), e.Message, "OK");
+                EditorUtility.DisplayDialog(GSEditorText.T("Splat Import Failed", "Splat インポート失敗", "Splat 导入失败"), e.Message, "OK");
                 Debug.LogException(e);
             }
             finally
