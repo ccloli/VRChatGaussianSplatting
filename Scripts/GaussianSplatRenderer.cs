@@ -112,6 +112,8 @@ public partial class GaussianSplatRenderer : UdonSharpBehaviour
     [SerializeField] bool overrideRenderQueue;
     [SerializeField] int startRenderQueue = DEFAULT_START_RENDER_QUEUE;
     [Range(0, 3)] [SerializeField] int requestedSHBand = 3;
+    [Tooltip("Bake fused SH into an array of up to 8K pages instead of one texture. Changing this setting rebakes the scene's SH in the editor.")]
+    [SerializeField] bool usePagedFusedSH;
     [Range(0.0f, 2.0f)] [SerializeField] public float gaussianScale = 1.0f;
     [Range(0.0f, 1.0f)] [SerializeField] float thinThreshold = 0.005f;
     [Range(0.0f, 3.0f)] [SerializeField] float antiAliasing = 1.0f;

@@ -7,6 +7,8 @@ Shader "Hidden/GaussianSplatting/LODCombine"
     Properties
     {
         [HideInInspector] _SHBand ("SH Band", Float) = 3
+        [HideInInspector] _LODFusedSH ("Fused SH", 2D) = "black" {}
+        [HideInInspector] _LODFusedSHArray ("Paged Fused SH", 2DArray) = "" {}
     }
     SubShader
     {
@@ -25,9 +27,13 @@ Shader "Hidden/GaussianSplatting/LODCombine"
         float4 _LODCombineOutputParams; // x = unused (0), y = combined coord shift, z/w unused
         float3 _LODCameraPosWorld;
 
-        // View-dependent SH. _LODShParams (objects x 4 cols): col0 (coeffCount, n, shBaseHi, shBaseLo),
-        // col1 (shMin.xyz, shBand), col2 (shRange.xyz, 0), col3 (objSrcBaseHi, objSrcBaseLo, 0, 0).
+        // View-dependent SH. col3 also carries the exact object count as hi/lo for new bakes.
+        #if defined(GS_FUSED_SH_PAGED)
+        Texture2DArray _LODFusedSHArray;
+        int _LODFusedShPageSize;
+        #else
         Texture2D _LODFusedSH;
+        #endif
         Texture2D<float4> _LODShParams;
         int _LODFusedShCoordShift, _LODFusedShCoordMask;
         float _SHBand;
@@ -69,15 +75,23 @@ Shader "Hidden/GaussianSplatting/LODCombine"
             return uint2((bx << 2) | (index & 3u), (by << 2) | ((index >> 2) & 3u));
         }
 
-        float3 GSDecodeFusedSH(float4 shLayout, float4 shMin, float4 shRange, uint id, int coeffIndex)
+        float3 GSDecodeFusedSH(float4 shLayout, float4 shMin, float4 shRange, uint shCount, uint id, int coeffIndex)
         {
             int coeffCount = (int)shLayout.x;
             if (coeffIndex < 0 || coeffIndex >= coeffCount) return 0.0;
-            uint linearIndex = (uint)coeffIndex * (uint)shLayout.y + id;
-            return shMin.xyz + _LODFusedSH[LODFusedShCoord(linearIndex)].rgb * shRange.xyz;
+            uint linearIndex = (uint)coeffIndex * shCount + id;
+            #if defined(GS_FUSED_SH_PAGED)
+            uint pageSize = (uint)_LODFusedShPageSize;
+            uint page = linearIndex / pageSize;
+            uint2 coord = LODFusedShCoord(linearIndex - page * pageSize);
+            float3 packedSH = _LODFusedSHArray.Load(int4((int2)coord, (int)page, 0)).rgb;
+            #else
+            float3 packedSH = _LODFusedSH[LODFusedShCoord(linearIndex)].rgb;
+            #endif
+            return shMin.xyz + packedSH * shRange.xyz;
         }
-        #define GS_DECODE_SH(id, coeffIndex) GSDecodeFusedSH(shLayout, shMin, shRange, id, coeffIndex)
-        #define GS_DECODE_SH_PARAMETERS float4 shLayout, float4 shMin, float4 shRange,
+        #define GS_DECODE_SH(id, coeffIndex) GSDecodeFusedSH(shLayout, shMin, shRange, shCount, id, coeffIndex)
+        #define GS_DECODE_SH_PARAMETERS float4 shLayout, float4 shMin, float4 shRange, uint shCount,
         #include "GaussianSplatShEval.cginc"
         #undef GS_DECODE_SH_PARAMETERS
         #undef GS_DECODE_SH
@@ -91,14 +105,16 @@ Shader "Hidden/GaussianSplatting/LODCombine"
             if (coeffCount <= 0) return baseColor;
             float4 p1 = _LODShParams[uint2(1, objId)];
             float4 p2 = _LODShParams[uint2(2, objId)];
+            float4 p3 = _LODShParams[uint2(3, objId)];
             float4 shLayout = float4(p0.x, p0.y, 0, 0);
             float4 shMin = float4(p1.xyz, 0);
             float4 shRange = float4(p2.xyz, 0);
             float shBand = min(p1.w, _SHBand);
+            uint shCount = (p3.z != 0.0 || p3.w != 0.0) ? (uint)p3.z * 4096u + (uint)p3.w : (uint)p0.y;
             uint id = (uint)p0.z * 4096u + (uint)p0.w + localWithinObject;
             float4x4 w2l = float4x4(_LODFusedTransforms[uint2(objId, 3)], _LODFusedTransforms[uint2(objId, 4)], _LODFusedTransforms[uint2(objId, 5)], float4(0, 0, 0, 1));
             float3 cameraPosObject = mul(w2l, float4(_LODCameraPosWorld, 1.0)).xyz;
-            return GSEvaluateDecodedSHColor(shLayout, shMin, shRange, baseColor, objPos, cameraPosObject, shBand, id);
+            return GSEvaluateDecodedSHColor(shLayout, shMin, shRange, shCount, baseColor, objPos, cameraPosObject, shBand, id);
         }
 
         float3 LODDequant(uint2 coord, uint2 mc)
@@ -179,6 +195,7 @@ Shader "Hidden/GaussianSplatting/LODCombine"
             ENDCG }
         Pass { CGPROGRAM
             #pragma target 3.5
+            #pragma multi_compile_local _ GS_FUSED_SH_PAGED
             #pragma vertex vert_img
             #pragma fragment fragColors
             ENDCG }

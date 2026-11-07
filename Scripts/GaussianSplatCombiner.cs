@@ -61,10 +61,11 @@ public partial class GaussianSplatCombiner : UdonSharpBehaviour
     [SerializeField] GameObject[] lodFusedObjects;
     [SerializeField] int lodFusedObjectCount, lodTotalChunks, lodMetaWidth, lodSelectionSide, lodFusedCoordShift, lodFusedCoordMask;
     // Every fused object is a GaussianSplatObject (1..N levels); its chunks feed the unified selection.
-    [SerializeField] Texture2D lodUnifiedSH, lodShParams;
-    [SerializeField] int lodUnifiedShCoordShift, lodUnifiedShCoordMask;
+    [SerializeField] Texture2D lodUnifiedSH, lodShParams; // legacy single-SH texture remains usable while rebaking
+    [SerializeField] Texture lodUnifiedSHArray;          // baked Texture2DArray, bound through the existing Texture API
+    [SerializeField] int lodUnifiedShCoordShift, lodUnifiedShCoordMask, lodUnifiedShPageSize;
     [SerializeField] int lodTotalSourceCount;   // total splats baked into the fused set (all objects, all levels)
-    [SerializeField] int lodShDroppedObjects;   // objects whose SH overflowed the single fused SH texture (render DC-only)
+    [SerializeField] int lodShDroppedObjects;   // unique sources whose SH exceeded the fused address limit
     // Per fused object (objId order) debug stats for the inspector table.
     [SerializeField, HideInInspector] int[] lodObjSplatCount;
     [SerializeField, HideInInspector] int[] lodObjFileCount;
@@ -491,9 +492,18 @@ public partial class GaussianSplatCombiner : UdonSharpBehaviour
         return count;
     }
 
-    // Runs the scene-global selection (2D mip pyramid -> single alpha = scene budget) then the combine over
-    // the whole fused set, writing the selection-compacted output [0, selected): every object's chunks flow
-    // through the same selection pass. selectionTarget drives the alpha adapt. Returns false if nothing baked.
+    void BindFusedSH()
+    {
+        if (lodUnifiedCombineMaterial == null) return;
+        bool useShArray = lodUnifiedSHArray != null && lodUnifiedShPageSize > 0;
+        if (useShArray) lodUnifiedCombineMaterial.EnableKeyword("GS_FUSED_SH_PAGED");
+        else lodUnifiedCombineMaterial.DisableKeyword("GS_FUSED_SH_PAGED");
+        lodUnifiedCombineMaterial.SetTexture("_LODFusedSH", lodUnifiedSH != null ? lodUnifiedSH : Texture2D.blackTexture);
+        lodUnifiedCombineMaterial.SetTexture("_LODFusedSHArray", useShArray ? lodUnifiedSHArray : null);
+        lodUnifiedCombineMaterial.SetInt("_LODFusedShPageSize", useShArray ? lodUnifiedShPageSize : 1);
+    }
+
+    // Runs the scene-global selection, then combines the selected splats from all objects.
     bool UpdateFusedLOD(Vector3 screenCameraPos, Vector3 lodCameraPos, Vector3 lodCameraForward, int lodRegionStart, int combinedCoordShift, int selectionTarget, Vector4 lodScreenParams, bool adaptLodSelection, bool forceMinLodAlpha, bool useEditorOps)
     {
         if (lodFusedObjectCount <= 0 || lodUnifiedSelectMaterial == null || lodUnifiedCombineMaterial == null
@@ -606,7 +616,7 @@ public partial class GaussianSplatCombiner : UdonSharpBehaviour
         // Fused SH set (view-dependent; _LODCameraPosWorld is the actual view camera). Every object's chunks
         // are filled by the selection descent - there is no separate identity region.
         lodUnifiedCombineMaterial.SetTexture("_LODShParams", lodShParams != null ? lodShParams : Texture2D.blackTexture);
-        lodUnifiedCombineMaterial.SetTexture("_LODFusedSH", lodUnifiedSH != null ? lodUnifiedSH : Texture2D.blackTexture);
+        BindFusedSH();
         lodUnifiedCombineMaterial.SetInt("_LODFusedShCoordShift", lodUnifiedShCoordShift);
         lodUnifiedCombineMaterial.SetInt("_LODFusedShCoordMask", lodUnifiedShCoordMask);
         lodUnifiedCombineMaterial.SetFloat("_SHBand", _lodShBand);
@@ -843,7 +853,7 @@ public partial class GaussianSplatCombiner : UdonSharpBehaviour
     {
         return FusedTextureBytes(lodFusedPositions) + FusedTextureBytes(lodFusedColors)
             + FusedTextureBytes(lodFusedRotations) + FusedTextureBytes(lodFusedScales)
-            + FusedTextureBytes(lodUnifiedSH);
+            + (lodUnifiedSHArray != null ? FusedTextureArrayBytes(lodUnifiedSHArray) : FusedTextureBytes(lodUnifiedSH));
     }
 
     static long FusedTextureBytes(Texture2D tex)
@@ -856,6 +866,14 @@ public partial class GaussianSplatCombiner : UdonSharpBehaviour
             return 0;
         }
         return (long)UnityEngine.Experimental.Rendering.GraphicsFormatUtility.ComputeMipmapSize(tex.width, tex.height, tex.graphicsFormat);
+    }
+
+    static long FusedTextureArrayBytes(Texture tex)
+    {
+        Texture2DArray array = tex as Texture2DArray;
+        return array != null
+            ? (long)UnityEngine.Experimental.Rendering.GraphicsFormatUtility.ComputeMipmapSize(array.width, array.height, array.graphicsFormat) * array.depth
+            : 0;
     }
 
     public float GetEditorReadbackAlpha()

@@ -79,6 +79,8 @@ Use this path to camera-sort splats at runtime in VRChat worlds (Udon):
 3. The renderer combines all active splats into one sorted render; use the gallery to show one at a time.
 4. Enter play mode or build. The renderer updates sorted render order for the active (screen + photo) cameras.
 
+The renderer's **Paged Fused SH (Experimental)** option changes how scene-wide SH is baked in the editor. It is off by default: the original single texture uses only the space needed, but has a 16384²-texel limit. Enable it for scenes exceeding that limit to bake an array of up to 8K pages; changing the option queues an SH rebake. The last page can waste space, and device texture-array support and available memory still limit capacity. This option does not stream LOD data or switch storage at runtime.
+
 ### How rendering works
 
 The renderer transforms all active splats into world space, writes them into combined render textures, and sorts the result as one renderer — so any number of active splats render together. Combined LOD selection, the per-platform splat budget, and the quality tiers build on top of this.

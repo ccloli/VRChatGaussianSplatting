@@ -32,6 +32,7 @@ namespace GaussianSplatting.Editor
         SerializedProperty _overrideRenderQueue;
         SerializedProperty _startRenderQueue;
         SerializedProperty _requestedSHBand;
+        SerializedProperty _usePagedFusedSH;
         bool _showFusedObjectTable;
         SerializedProperty _gaussianScale;
         SerializedProperty _thinThreshold;
@@ -69,6 +70,7 @@ namespace GaussianSplatting.Editor
             _overrideRenderQueue = serializedObject.FindProperty("overrideRenderQueue");
             _startRenderQueue = serializedObject.FindProperty("startRenderQueue");
             _requestedSHBand = serializedObject.FindProperty("requestedSHBand");
+            _usePagedFusedSH = serializedObject.FindProperty("usePagedFusedSH");
             _gaussianScale = serializedObject.FindProperty("gaussianScale");
             _thinThreshold = serializedObject.FindProperty("thinThreshold");
             _antiAliasing = serializedObject.FindProperty("antiAliasing");
@@ -294,17 +296,37 @@ namespace GaussianSplatting.Editor
         void DrawMaterialSettings()
         {
             EditorGUILayout.IntSlider(_requestedSHBand, 0, 3, GSEditorText.C("Requested SH Band", "要求 SH バンド", "请求的 SH 阶数"));
+            GUIContent pagedLabel = GSEditorText.C("Paged Fused SH (Experimental)", "ページ分割 SH (実験的)");
+            pagedLabel.tooltip = GSEditorText.T("May use more memory and requires texture-array support on the target device. Changing this rebakes SH.",
+                "メモリ使用量が増える可能性があり、端末がテクスチャ配列に対応している必要があります。変更すると SH を再ベイクします。");
+            using (new EditorGUI.DisabledScope(Application.isPlaying))
+                EditorGUILayout.PropertyField(_usePagedFusedSH, pagedLabel);
+            if (_usePagedFusedSH.boolValue)
+                EditorGUILayout.HelpBox(GSEditorText.T(
+                    "Editor bake setting: SH is stored in an array of up to 8K pages. Changing this rebakes SH. Array support and memory use depend on the target device; the last page may be partly unused.",
+                    "エディタのベイク設定: SH を最大 8K のページ配列に保存します。変更すると SH を再ベイクします。配列の対応状況とメモリ使用量は端末に依存し、最後のページに未使用領域が生じる場合があります。"), MessageType.Warning);
             if (!serializedObject.isEditingMultipleObjects && target is GaussianSplatRenderer shRenderer)
             {
                 GaussianSplatCombiner shCombiner = shRenderer.GetCombiner();
                 int droppedSh = shCombiner != null ? shCombiner.GetFusedShDroppedObjectCount() : 0;
                 if (droppedSh > 0)
                 {
-                    EditorGUILayout.HelpBox(GSEditorText.T(
-                        $"Spherical harmonics were dropped for {droppedSh} object(s): the scene's total SH exceeds the single fused SH texture cap (16384² texels). Those splats render without view-dependent color regardless of this setting. Lower the SH band on some splats, reduce splat counts, or split the scene.",
-                        $"{droppedSh} 個のオブジェクトの球面調和が破棄されました: シーン全体の SH が単一の統合 SH テクスチャ上限 (16384² テクセル) を超えています。該当スプラットはこの設定に関わらず視点依存色なしで描画されます。一部スプラットの SH バンドを下げる、スプラット数を減らす、またはシーンを分割してください。",
-                        $"{droppedSh} 个对象的球谐数据已被丢弃：场景 SH 总量超过单张融合 SH 纹理的上限（16384² 纹素）。这些 Splat 无论此设置为何值，都将不带视角相关颜色渲染。请降低部分 Splat 的 SH 阶数、减少 Splat 数量或拆分场景。"),
-                        MessageType.Warning);
+                    if (shCombiner.GetFusedShAddressLimit() == GaussianSplatFuse.SingleFusedShTexels)
+                    {
+                        EditorGUILayout.HelpBox(GSEditorText.T(
+                            $"Spherical harmonics were dropped for {droppedSh} object(s): the scene's total SH exceeds the single fused SH texture cap (16384² texels). Those splats render without view-dependent color regardless of this setting. Lower the SH band on some splats, reduce splat counts, or split the scene.",
+                            $"{droppedSh} 個のオブジェクトの球面調和が破棄されました: シーン全体の SH が単一の統合 SH テクスチャ上限 (16384² テクセル) を超えています。該当スプラットはこの設定に関わらず視点依存色なしで描画されます。一部スプラットの SH バンドを下げる、スプラット数を減らす、またはシーンを分割してください。",
+                            $"{droppedSh} 个对象的球谐数据已被丢弃：场景 SH 总量超过单张融合 SH 纹理的上限（16384² 纹素）。这些 Splat 无论此设置为何值，都将不带视角相关颜色渲染。请降低部分 Splat 的 SH 阶数、减少 Splat 数量或拆分场景。")
+                            + (_usePagedFusedSH.boolValue ? "" : "\nEnable Paged Fused SH to increase the limit."),
+                            MessageType.Warning);
+                    }
+                    else
+                    {
+                        EditorGUILayout.HelpBox(GSEditorText.T(
+                            $"Spherical harmonics were dropped for {droppedSh} source(s): the fused SH address limit was exceeded. Those splats render without view-dependent color regardless of this setting. Lower the SH band, reduce splat counts, or split the scene.",
+                            $"{droppedSh} 個のソースの球面調和が破棄されました: 統合 SH のアドレス上限を超えています。該当スプラットは視点依存色なしで描画されます。SH バンドを下げる、スプラット数を減らす、またはシーンを分割してください。"),
+                            MessageType.Warning);
+                    }
                 }
                 DrawFusedObjectTable(shCombiner);
             }
@@ -359,8 +381,7 @@ namespace GaussianSplatting.Editor
             }
         }
 
-        // Debug table of every fused object's params (splats / files / chunks / SH), including which objects had
-        // their SH dropped because the scene's total SH exceeds the single fused SH texture (GaussianSplatFuse cap).
+        // Debug table of every fused object's params; shared sources count only once toward SH storage.
         void DrawFusedObjectTable(GaussianSplatCombiner combiner)
         {
             if (combiner == null)
@@ -377,12 +398,15 @@ namespace GaussianSplatting.Editor
             {
                 return;
             }
-            long cap = GaussianSplatFuse.MaxFusedShTexels;
+            long cap = combiner.GetFusedShAddressLimit();
             long shUsed = 0, shRequested = 0, splatTotal = 0;
             foreach (var r in rows)
             {
-                shRequested += r.shTexels;
-                if (!r.shDropped) shUsed += r.shTexels;
+                if (!r.sharedSource)
+                {
+                    shRequested += r.shTexels;
+                    if (!r.shDropped) shUsed += r.shTexels;
+                }
                 splatTotal += r.splats;
             }
             using (new EditorGUI.IndentLevelScope())
@@ -404,7 +428,7 @@ namespace GaussianSplatting.Editor
                 {
                     int band = r.shCoeff >= 15 ? 3 : (r.shCoeff >= 8 ? 2 : (r.shCoeff >= 3 ? 1 : 0));
                     string shTex = r.shCoeff > 0 ? $"{r.shTexels:N0} ({(cap > 0 ? 100.0 * r.shTexels / cap : 0):F1}%)" : "-";
-                    string flag = r.shDropped ? GSEditorText.T("DROPPED", "破棄", "已丢弃") : (r.shCoeff > 0 ? "" : GSEditorText.T("no SH", "SH なし", "无 SH"));
+                    string flag = r.shDropped ? GSEditorText.T("DROPPED", "破棄", "已丢弃") : (r.sharedSource ? "shared" : (r.shCoeff > 0 ? "" : GSEditorText.T("no SH", "SH なし", "无 SH")));
                     DrawFusedTableRow(r.name, r.active ? GSEditorText.T("yes", "はい", "是") : GSEditorText.T("no", "いいえ", "否"), $"{r.splats:N0}", r.files.ToString(), r.chunks.ToString(), band.ToString(), shTex, flag, cell);
                 }
             }
