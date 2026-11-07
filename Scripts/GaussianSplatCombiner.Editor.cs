@@ -746,7 +746,7 @@ public partial class GaussianSplatCombiner
         return range.height >= metaHeight * 2;
     }
 
-    static bool FusedLODAssetsExist(string folder, string prefix, int totalChunks, bool requireRangeStats)
+    static bool FusedLODAssetsExist(string folder, string prefix, int totalChunks, bool requireRangeStats, bool usePagedSH)
     {
         Texture2D range = AssetDatabase.LoadAssetAtPath<Texture2D>(folder + "/" + prefix + "_LODGlobalRange.asset");
         bool required = TextureAssetExists(folder + "/" + prefix + "_LODFusedPositions.asset")
@@ -755,7 +755,11 @@ public partial class GaussianSplatCombiner
             && TextureAssetExists(folder + "/" + prefix + "_LODFusedScales.asset")
             && TextureAssetExists(folder + "/" + prefix + "_LODGlobalBounds.asset")
             && range != null
-            && TextureAssetExists(folder + "/" + prefix + "_LODFileBase.asset");
+            && TextureAssetExists(folder + "/" + prefix + "_LODFileBase.asset")
+            && TextureAssetExists(folder + "/" + prefix + "_LODShParams.asset")
+            && (usePagedSH
+                ? AssetDatabase.LoadAssetAtPath<Texture2DArray>(folder + "/" + prefix + "_LODFusedSHArray.asset") != null
+                : TextureAssetExists(folder + "/" + prefix + "_LODFusedSH.asset"));
         if (!required)
         {
             return false;
@@ -765,7 +769,7 @@ public partial class GaussianSplatCombiner
 
     // Reload an already-current unified LOD fused set from disk instead of re-baking. objs must be in the
     // same reload-stable order as the bake (transform-table row k <-> objs[k]); the caller guarantees this.
-    bool TryReloadFusedLODFromDisk(string folder, string prefix, List<GameObject> objs, int totalChunks, bool requireRangeStats)
+    bool TryReloadFusedLODFromDisk(string folder, string prefix, List<GameObject> objs, int totalChunks, bool requireRangeStats, bool usePagedSH)
     {
         Texture2D pos = AssetDatabase.LoadAssetAtPath<Texture2D>(folder + "/" + prefix + "_LODFusedPositions.asset");
         Texture2D col = AssetDatabase.LoadAssetAtPath<Texture2D>(folder + "/" + prefix + "_LODFusedColors.asset");
@@ -774,7 +778,10 @@ public partial class GaussianSplatCombiner
         Texture2D bounds = AssetDatabase.LoadAssetAtPath<Texture2D>(folder + "/" + prefix + "_LODGlobalBounds.asset");
         Texture2D rng = AssetDatabase.LoadAssetAtPath<Texture2D>(folder + "/" + prefix + "_LODGlobalRange.asset");
         Texture2D fbase = AssetDatabase.LoadAssetAtPath<Texture2D>(folder + "/" + prefix + "_LODFileBase.asset");
-        if (pos == null || col == null || rot == null || scl == null || bounds == null || rng == null || fbase == null)
+        Texture2DArray shArray = usePagedSH ? AssetDatabase.LoadAssetAtPath<Texture2DArray>(folder + "/" + prefix + "_LODFusedSHArray.asset") : null;
+        Texture2D sh = usePagedSH ? null : AssetDatabase.LoadAssetAtPath<Texture2D>(folder + "/" + prefix + "_LODFusedSH.asset");
+        Texture2D shParams = AssetDatabase.LoadAssetAtPath<Texture2D>(folder + "/" + prefix + "_LODShParams.asset");
+        if (pos == null || col == null || rot == null || scl == null || bounds == null || rng == null || fbase == null || (usePagedSH ? shArray == null : sh == null) || shParams == null)
         {
             return false;
         }
@@ -784,9 +791,11 @@ public partial class GaussianSplatCombiner
         }
         lodFusedPositions = pos; lodFusedColors = col; lodFusedRotations = rot; lodFusedScales = scl;
         lodGlobalBounds = bounds; lodGlobalRange = rng; lodFileBase = fbase;
-        lodUnifiedSH = AssetDatabase.LoadAssetAtPath<Texture2D>(folder + "/" + prefix + "_LODFusedSH.asset");
-        lodShParams = AssetDatabase.LoadAssetAtPath<Texture2D>(folder + "/" + prefix + "_LODShParams.asset");
-        int shBpr = Mathf.Max(1, lodUnifiedSH != null ? lodUnifiedSH.width >> 2 : 1);
+        lodUnifiedSHArray = shArray;
+        lodUnifiedSH = sh;
+        lodShParams = shParams;
+        lodUnifiedShPageSize = shArray != null ? shArray.width * shArray.height : 0;
+        int shBpr = Mathf.Max(1, (usePagedSH ? shArray.width : sh.width) >> 2);
         lodUnifiedShCoordShift = ComputeTextureCoordShift(shBpr);
         lodUnifiedShCoordMask = shBpr - 1;
         // Total baked into the (deduped) fused source = every file's splat count (fileBase row z channel).
@@ -806,6 +815,7 @@ public partial class GaussianSplatCombiner
         lodFusedCoordShift = ComputeTextureCoordShift(bpr);
         lodFusedCoordMask = bpr - 1;
         EnsureUnifiedLODMaterials(folder, prefix);
+        BindFusedSH();
         return lodUnifiedCombineMaterial != null;
     }
 
@@ -1020,15 +1030,19 @@ public partial class GaussianSplatCombiner
         public int shCoeff;   // SH coefficients the source carries (0 = none)
         public long shTexels; // SH texels this object asks of the fused SH texture
         public bool shDropped;
+        public bool sharedSource;
     }
 
     public List<FusedObjectDebugRow> GetFusedObjectDebugRows()
     {
         var rows = new List<FusedObjectDebugRow>();
+        var seenSources = new HashSet<Texture2D>();
         int n = lodObjSplatCount != null ? lodObjSplatCount.Length : 0;
         for (int i = 0; i < n; i++)
         {
             GameObject go = lodFusedObjects != null && i < lodFusedObjects.Length ? lodFusedObjects[i] : null;
+            GaussianSplatObject source = go != null ? go.GetComponent<GaussianSplatObject>() : null;
+            Texture2D sourceKey = source != null && source.positions != null && source.positions.Length > 0 ? source.positions[0] : null;
             int coeff = lodObjShCoeff != null && i < lodObjShCoeff.Length ? lodObjShCoeff[i] : 0;
             int splats = lodObjSplatCount[i];
             rows.Add(new FusedObjectDebugRow
@@ -1041,9 +1055,15 @@ public partial class GaussianSplatCombiner
                 shCoeff = coeff,
                 shTexels = (long)coeff * splats,
                 shDropped = lodObjShDropped != null && i < lodObjShDropped.Length && lodObjShDropped[i],
+                sharedSource = sourceKey != null && !seenSources.Add(sourceKey),
             });
         }
         return rows;
+    }
+
+    public long GetFusedShAddressLimit()
+    {
+        return lodUnifiedSHArray != null ? GaussianSplatFuse.MaxFusedShTexels : GaussianSplatFuse.SingleFusedShTexels;
     }
 
     void QueueFusedLODBake(int signature)
@@ -1084,7 +1104,7 @@ public partial class GaussianSplatCombiner
         BuildFusedLOD(ownerName, true);
     }
 
-    void StartFusedLODJob(List<GaussianSplatFuse.FuseLODSource> sources, string folder, string prefix, GaussianSplatFuse.FuseLODResult reuseFrom, int signature, int sourceSignature, List<GameObject> combinedObjects)
+    void StartFusedLODJob(List<GaussianSplatFuse.FuseLODSource> sources, string folder, string prefix, GaussianSplatFuse.FuseLODResult reuseFrom, int signature, int sourceSignature, List<GameObject> combinedObjects, bool usePagedSH)
     {
         if (_activeFusedBakeJob != null)
         {
@@ -1101,7 +1121,7 @@ public partial class GaussianSplatCombiner
             folder = folder,
             prefix = prefix
         };
-        _activeFusedBakeJob = GaussianSplatFuse.CreateFuseLODJob(sources, folder, prefix, reuseFrom);
+        _activeFusedBakeJob = GaussianSplatFuse.CreateFuseLODJob(sources, folder, prefix, reuseFrom, usePagedSH);
         if (_activeFusedBakeJob == null || _activeFusedBakeJob.Result == null)
         {
             _activeFusedBakeJob = null;
@@ -1128,10 +1148,12 @@ public partial class GaussianSplatCombiner
         lodGlobalBounds = res.globalBounds;
         lodGlobalRange = res.globalRange;
         lodFileBase = res.fileBaseTable;
+        lodUnifiedSHArray = res.fusedSHArray;
         lodUnifiedSH = res.fusedSH;
         lodShParams = res.shParams;
         lodUnifiedShCoordShift = res.fusedShCoordShift;
         lodUnifiedShCoordMask = res.fusedShCoordMask;
+        lodUnifiedShPageSize = res.fusedSHArray != null ? res.fusedSHArray.width * res.fusedSHArray.height : 0;
         lodTotalSourceCount = res.totalSourceCount;
         lodShDroppedObjects = res.shDroppedObjects;
         lodObjSplatCount = res.objSplatCount;
@@ -1150,6 +1172,8 @@ public partial class GaussianSplatCombiner
         lodFusedCoordShift = ComputeTextureCoordShift(bpr);
         lodFusedCoordMask = bpr - 1;
         EnsureUnifiedLODMaterials(commit.folder, commit.prefix);
+        BindFusedSH();
+        if (lodUnifiedCombineMaterial != null) EditorUtility.SetDirty(lodUnifiedCombineMaterial);
         SaveFuseSig("LOD", commit.prefix, commit.signature);
         SaveFuseSig("LODsrc", commit.prefix, commit.sourceSignature);
         ClearQueuedFusedLODBake();
@@ -1166,7 +1190,9 @@ public partial class GaussianSplatCombiner
         // texture's GUID hash) so the fused concatenation order is reproducible across domain reloads.
         // The per-object transform-table row k maps to objs[k] at runtime; an InstanceID sort is NOT
         // stable across reloads and would break the reload-from-disk fast path.
-        int sig = 20; // cheap content signature: object set + source textures + chunk/splat counts.
+        GaussianSplatRenderer owner = ResolveOwner();
+        bool usePagedSH = owner != null && owner.GetUsePagedFusedSH();
+        int sig = usePagedSH ? 22 : 21; // invalidate metadata and rebake when the chosen SH representation changes.
                       // Bump the seed on fused-metadata FORMAT changes so old bakes regenerate once instead of
                       // being reused via the fast path.
 
@@ -1247,10 +1273,10 @@ public partial class GaussianSplatCombiner
         EnsureUnifiedLODMaterials(folder, prefix);
 
         // Fast path A: already current in memory (steady-state refresh / saved scene after reload).
-        if (sig == lodFusedSignature && lodFusedPositions != null
+        if (sig == lodFusedSignature && lodFusedPositions != null && (usePagedSH ? lodUnifiedSHArray != null : lodUnifiedSH != null)
             && FusedLODObjectRefsMatch(lodFusedObjects, combinedObjs) && lodUnifiedCombineMaterial != null
             && (lodSelectionSide > 0 || totalChunks == 0)
-            && FusedLODAssetsExist(folder, prefix, totalChunks, requireRangeStats))
+            && FusedLODAssetsExist(folder, prefix, totalChunks, requireRangeStats, usePagedSH))
         {
             ClearQueuedFusedLODBake();
             return;
@@ -1258,7 +1284,7 @@ public partial class GaussianSplatCombiner
 
         // Fast path B: the on-disk baked assets are already current for this content (EditorPrefs signature
         // survives reload + unsaved scene). Reload them instead of re-running the heavy ~GB fuse + rewrite.
-        if (sig == LoadFuseSig("LOD", prefix) && TryReloadFusedLODFromDisk(folder, prefix, combinedObjs, totalChunks, requireRangeStats))
+        if (sig == LoadFuseSig("LOD", prefix) && TryReloadFusedLODFromDisk(folder, prefix, combinedObjs, totalChunks, requireRangeStats, usePagedSH))
         {
             lodFusedSignature = sig;
             lodFusedSourceSignature = sourceSig;
@@ -1281,6 +1307,7 @@ public partial class GaussianSplatCombiner
         GaussianSplatFuse.FuseLODResult reuseFrom = null;
         bool sourceCached = sourceSig == lodFusedSourceSignature && lodFusedPositions != null
             && lodFusedColors != null && lodFusedRotations != null && lodFusedScales != null;
+        bool shMemoryCached = sourceCached;
         if (!sourceCached && sourceSig == LoadFuseSig("LODsrc", prefix))
         {
             Texture2D pos = AssetDatabase.LoadAssetAtPath<Texture2D>(folder + "/" + prefix + "_LODFusedPositions.asset");
@@ -1290,7 +1317,6 @@ public partial class GaussianSplatCombiner
             if (pos != null && col != null && rot != null && scl != null)
             {
                 lodFusedPositions = pos; lodFusedColors = col; lodFusedRotations = rot; lodFusedScales = scl;
-                lodUnifiedSH = AssetDatabase.LoadAssetAtPath<Texture2D>(folder + "/" + prefix + "_LODFusedSH.asset");
                 sourceCached = true;
             }
         }
@@ -1299,11 +1325,13 @@ public partial class GaussianSplatCombiner
             reuseFrom = new GaussianSplatFuse.FuseLODResult
             {
                 fusedPositions = lodFusedPositions, fusedColors = lodFusedColors,
-                fusedRotations = lodFusedRotations, fusedScales = lodFusedScales, fusedSH = lodUnifiedSH,
+                fusedRotations = lodFusedRotations, fusedScales = lodFusedScales,
+                fusedSH = shMemoryCached ? lodUnifiedSH : null,
+                fusedSHArray = shMemoryCached ? lodUnifiedSHArray as Texture2DArray : null,
             };
         }
 
-        StartFusedLODJob(srcs, folder, prefix, reuseFrom, sig, sourceSig, combinedObjs);
+        StartFusedLODJob(srcs, folder, prefix, reuseFrom, sig, sourceSig, combinedObjs, usePagedSH);
     }
 
     static bool EnsureBucketArray(ref RenderTexture[] textures)

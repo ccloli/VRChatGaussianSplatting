@@ -823,6 +823,8 @@ public partial class GaussianSplatRenderer
         QueueEditorRefresh();
     }
 
+    public bool GetUsePagedFusedSH() { return usePagedFusedSH; }
+
     bool MigrateEditorSerializedDefaults()
     {
         if (combinedLodSettingsVersion >= COMBINED_LOD_SETTINGS_VERSION_TARGET_SCALE_095)

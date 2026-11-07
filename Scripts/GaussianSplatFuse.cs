@@ -45,8 +45,9 @@ namespace GaussianSplatting
             public Texture2D globalBounds;    // chunks, 2D stacked: [0,metaH) min (xyz,w=splatCount), [metaH,2metaH) max (xyz,w=globalFileId)
             public Texture2D globalRange;     // chunks (offsetHi, offsetLo, lod0Count, w = GLOBAL objectId)
             public Texture2D fileBaseTable;   // per file: (fusedBase hi/lo, fileSplatCount, 0)
-            // SH set + per-object params (objects x 4 columns: [param, objId]).
+            // One of these SH representations is populated, according to the editor bake setting.
             public Texture2D fusedSH;
+            public Texture2DArray fusedSHArray;
             public Texture2D shParams;
             public int fusedShCoordShift;
             public int fusedShCoordMask;
@@ -55,13 +56,13 @@ namespace GaussianSplatting
             public int fileCount;
             public int objectCount;           // total = nonLodObjectCount + LOD objects
             public int metaWidth;             // global metadata 2D row width: chunk c -> uint2(c%metaWidth, c/metaWidth)
-            public int shDroppedObjects;      // objects whose SH overflowed the single fused SH texture (render DC-only)
+            public int shDroppedObjects;      // unique sources whose SH exceeded the addressable limit
             // Per fused object (objId order) debug stats for the inspector table.
             public int[] objSplatCount;       // source splat count (n)
             public int[] objFileCount;        // number of source files
             public int[] objChunkCount;       // chunk count
             public int[] objShCoeff;          // SH coeff count its source carries (0 = no SH)
-            public bool[] objShDropped;       // had SH but it was dropped because the fused SH texture is full
+            public bool[] objShDropped;       // had SH but it exceeded the addressable limit
         }
 
         // Each chunk's in-file source offset (offsetHi*GSLOD_OFFSET_BASE + offsetLo) is unchanged; the
@@ -69,9 +70,50 @@ namespace GaussianSplatting
         // stay per-(global)chunk. objectId (range.w) lets selection/combine pick the object's params.
         public const float GSLOD_OFFSET_BASE = 4096.0f;
 
-        // The fused SH set is a single texture; its texel count can't exceed the max texture dimension squared.
-        // Objects whose SH would push past this are baked DC-only (clean fallback) instead of overflowing.
-        public const long MaxFusedShTexels = 16384L * 16384L;
+        // Use 8K pages for large sets. Global indices and the existing concat-region fields are signed ints;
+        // the practical limit may be lower on devices with fewer array slices or insufficient memory.
+        public const int FusedShPageDimension = 8192;
+        public const long SingleFusedShTexels = 16384L * 16384L;
+        public const long MaxFusedShTexels = int.MaxValue;
+
+        internal readonly struct ShPageLayout
+        {
+            public readonly int width, height, pages;
+            public int PageTexels => width * height;
+
+            public ShPageLayout(int width, int height, int pages)
+            {
+                this.width = width;
+                this.height = height;
+                this.pages = pages;
+            }
+        }
+
+        // A single small page is sized to the data, avoiding a 64 MiB allocation for every small scene.
+        // Multiple pages use full, equal dimensions as required by Texture2DArray.
+        internal static ShPageLayout ChooseShPageLayout(int texelCount, int maxDimension = FusedShPageDimension)
+        {
+            if (maxDimension < 4 || (maxDimension & (maxDimension - 1)) != 0)
+                throw new ArgumentOutOfRangeException(nameof(maxDimension));
+            int count = Mathf.Max(1, texelCount);
+            long pageCapacity = (long)maxDimension * maxDimension;
+            if (count > pageCapacity)
+                return new ShPageLayout(maxDimension, maxDimension, (int)(((long)count + pageCapacity - 1) / pageCapacity));
+
+            GaussianSplatImporter.TextureLayout layout = GaussianSplatImporter.ChoosePotTextureLayout(count);
+            // The general layout chooser uses float division, which can round down for large counts.
+            // Recompute height with integers so the final texel always has a valid destination.
+            int exactHeight = AlignToBCBlock((int)(((long)count + layout.Width - 1) / layout.Width));
+            layout = new GaussianSplatImporter.TextureLayout(layout.Width, exactHeight);
+            if (layout.Width > maxDimension || layout.Height > maxDimension)
+            {
+                int minWidth = Mathf.Max(4, (int)(((long)count + maxDimension - 1) / maxDimension));
+                int width = Mathf.NextPowerOfTwo(minWidth);
+                int height = AlignToBCBlock((int)(((long)count + width - 1) / width));
+                return new ShPageLayout(width, height, 1);
+            }
+            return new ShPageLayout(layout.Width, layout.Height, 1);
+        }
 
         // Builds the bake plan (all CPU metadata + region lists), then returns a job that streams the heavy GPU
         // concat + readback across editor frames via Step(). Returns a job whose Result is null when there is no
@@ -81,12 +123,12 @@ namespace GaussianSplatting
         // pass the previously baked fused source textures to SKIP the heavy GPU source concat + readback. The
         // (small) per-instance metadata textures are always rebuilt. The deduped source size is stable across
         // duplicate add/remove, so the cached textures stay dimension-compatible.
-        public static FuseLODJob CreateFuseLODJob(List<FuseLODSource> sources, string outFolder, string assetPrefix, FuseLODResult reuseFrom = null)
+        public static FuseLODJob CreateFuseLODJob(List<FuseLODSource> sources, string outFolder, string assetPrefix, FuseLODResult reuseFrom = null, bool usePagedSH = false)
         {
-            return new FuseLODJob(BuildFuseLODPlan(sources, outFolder, assetPrefix, reuseFrom));
+            return new FuseLODJob(BuildFuseLODPlan(sources, outFolder, assetPrefix, reuseFrom, usePagedSH));
         }
 
-        static FuseLODPlan BuildFuseLODPlan(List<FuseLODSource> sources, string outFolder, string assetPrefix, FuseLODResult reuseFrom)
+        static FuseLODPlan BuildFuseLODPlan(List<FuseLODSource> sources, string outFolder, string assetPrefix, FuseLODResult reuseFrom, bool usePagedSH)
         {
             sources = sources ?? new List<FuseLODSource>();
 
@@ -122,7 +164,8 @@ namespace GaussianSplatting
             var shRegions = new List<FileRegion>();   // .pos = SH source; base/count are SH-texel-space
             var shParams = new List<Color>();          // 4 rows per object, appended in objId order
             int shCursor = 0;
-            int shDroppedObjects = 0;                  // objects whose SH overflowed the single fused SH texture
+            long shAddressLimit = usePagedSH ? MaxFusedShTexels : SingleFusedShTexels;
+            int shDroppedObjects = 0;                  // unique sources whose SH exceeded the index limit
             long shRequestedTexels = 0;                // SH texels the scene asked for (placed + dropped)
             var objSplatCount = new int[lod.Count];    // per object debug stats for the inspector table
             var objFileCount = new int[lod.Count];
@@ -174,9 +217,8 @@ namespace GaussianSplatting
                     // src = file SH coeff block at coeff*fileCount. Decode: id = shBase + coeff*n + (gsi - objSrcBase).
                     int shCoeffNew = s.sh != null && s.shCoeffCount > 0 ? s.shCoeffCount : 0;
                     shRequestedTexels += (long)shCoeffNew * objTotalCount;
-                    // The fused SH is one texture (max 16384^2 texels). If this object's SH would overflow it, drop
-                    // SH for this object (renders DC, clean) rather than writing past the texture (garbage reads).
-                    if (shCoeffNew > 0 && (long)shCursor + (long)shCoeffNew * objTotalCount > MaxFusedShTexels) { shCoeffNew = 0; shDroppedObjects++; }
+                    // Keep the existing DC-only fallback at the signed-index limit instead of overflowing.
+                    if (shCoeffNew > 0 && (long)shCursor + (long)shCoeffNew * objTotalCount > shAddressLimit) { shCoeffNew = 0; shDroppedObjects++; }
                     int objShBase = shCursor;
                     if (shCoeffNew > 0)
                     {
@@ -221,7 +263,8 @@ namespace GaussianSplatting
                 shParams.Add(new Color(entry.shCoeff, entry.totalCount, entry.shBase / 4096, entry.shBase % 4096)); // row0
                 shParams.Add(new Color(s.shMin.x, s.shMin.y, s.shMin.z, s.shBand));                                  // row1
                 shParams.Add(new Color(s.shRange.x, s.shRange.y, s.shRange.z, 0));                                   // row2
-                shParams.Add(new Color(entry.srcBase / 4096, entry.srcBase % 4096, 0, 0));                           // row3 objSrcBase
+                // Store the count as hi/lo too: a float cannot represent every integer above 2^24.
+                shParams.Add(new Color(entry.srcBase / 4096, entry.srcBase % 4096, entry.totalCount / 4096, entry.totalCount % 4096)); // row3
 
                 objSplatCount[k] = entry.totalCount;
                 objFileCount[k] = s.positions != null ? s.positions.Length : 0;
@@ -230,11 +273,9 @@ namespace GaussianSplatting
                 objShDropped[k] = objShCoeff[k] > 0 && entry.shCoeff == 0; // source carried SH but it didn't fit
             }
 
-            // The whole scene's SH must fit one texture. When it doesn't, objects past the cap rendered DC-only
-            // above; warn loudly (it was previously silent) so it's clear why those splats show no view-dependent SH.
             if (shDroppedObjects > 0)
             {
-                Debug.LogWarning($"[GaussianSplatFuse] Scene spherical harmonics ({shRequestedTexels:N0} texels) exceed the single fused SH texture cap ({MaxFusedShTexels:N0}); SH was dropped for {shDroppedObjects} object(s), which now render without view-dependent color. Lower the SH band on some splats, reduce splat counts, or split the scene to fit.");
+                Debug.LogWarning($"[GaussianSplatFuse] Scene spherical harmonics ({shRequestedTexels:N0} texels) exceed the {(usePagedSH ? "paged" : "single-texture")} fused SH limit ({shAddressLimit:N0}); SH was dropped for {shDroppedObjects} source(s), which now render without view-dependent color. {(usePagedSH ? "Lower the SH band, reduce splat counts, or split the scene." : "Enable Paged Fused SH in the renderer, lower the SH band, reduce splat counts, or split the scene.")}");
             }
 
             FuseLODResult res = new FuseLODResult { totalSourceCount = fusedCursor, totalChunkCount = totalChunks, fileCount = globalFileId, objectCount = lod.Count, shDroppedObjects = shDroppedObjects,
@@ -271,23 +312,20 @@ namespace GaussianSplatting
             Color[] fbPix = new Color[fbw];
             for (int i = 0; i < fileBase.Count; i++) fbPix[i] = new Color(fileBase[i].x, fileBase[i].y, fileBase[i].z, fileBase[i].w);
 
-            // Unified SH set (BC7) + per-object params (4 cols x totalObjects rows; combine reads
-            // _LODShParams[uint2(param, objId)] -> array index objId*4 + param, matching append order).
-            // ChoosePotTextureLayout can exceed the 16384 max texture dimension for a scene-wide fused SH; force a
-            // POT width wide enough that height stays <= 16384 (single-texture ceiling is 16384^2 = 268M texels).
-            const int kMaxTexDim = 16384;
-            int shTexels = Mathf.Max(1, shCursor);
-            GaussianSplatImporter.TextureLayout shLayout = GaussianSplatImporter.ChoosePotTextureLayout(shTexels);
-            if (shLayout.Width > kMaxTexDim || shLayout.Height > kMaxTexDim)
+            // Each slice uses the same 4x4 block swizzle as the old single texture.
+            ShPageLayout shLayout = ChooseShPageLayout(shCursor, usePagedSH ? FusedShPageDimension : 16384);
+            if (shLayout.width > SystemInfo.maxTextureSize || shLayout.height > SystemInfo.maxTextureSize
+                || (usePagedSH && (!SystemInfo.supports2DArrayTextures || shLayout.pages > SystemInfo.maxTextureArraySlices)))
+                throw new InvalidOperationException($"Fused SH requires a {shLayout.width}x{shLayout.height} {(usePagedSH ? "texture array with " + shLayout.pages + " slice(s)" : "texture")}, which this editor GPU does not support.");
+            bool reuseSH = reuseSrc && (usePagedSH
+                ? reuseFrom.fusedSHArray != null && reuseFrom.fusedSHArray.width == shLayout.width && reuseFrom.fusedSHArray.height == shLayout.height && reuseFrom.fusedSHArray.depth == shLayout.pages
+                : reuseFrom.fusedSH != null && reuseFrom.fusedSH.width == shLayout.width && reuseFrom.fusedSH.height == shLayout.height);
+            if (reuseSH)
             {
-                int w = Mathf.Min(kMaxTexDim, Mathf.NextPowerOfTwo((shTexels + kMaxTexDim - 1) / kMaxTexDim));
-                int h = Mathf.Min(kMaxTexDim, AlignToBCBlock((shTexels + w - 1) / w));
-                if ((long)w * h < shTexels) Debug.LogWarning($"[GaussianSplatFuse] Fused SH ({shTexels:N0} texels) exceeds one {kMaxTexDim}^2 texture; some SH will be dropped. Reduce per-object SH or scene SH count.");
-                shLayout = new GaussianSplatImporter.TextureLayout(w, h);
+                if (usePagedSH) res.fusedSHArray = reuseFrom.fusedSHArray;
+                else res.fusedSH = reuseFrom.fusedSH;
             }
-            bool reuseSH = reuseSrc && reuseFrom.fusedSH != null && reuseFrom.fusedSH.width == shLayout.Width && reuseFrom.fusedSH.height == shLayout.Height;
-            if (reuseSH) res.fusedSH = reuseFrom.fusedSH;
-            int shBpr = Mathf.Max(1, shLayout.Width >> 2);
+            int shBpr = Mathf.Max(1, shLayout.width >> 2);
             res.fusedShCoordShift = GaussianSplatImporter.ComputeTextureCoordShift(shBpr);
             res.fusedShCoordMask = shBpr - 1;
             Color[] spPix = new Color[4 * Mathf.Max(1, lod.Count)];
@@ -302,10 +340,12 @@ namespace GaussianSplatting
                 shRegions = shRegions,
                 reuseSrc = reuseSrc,
                 reuseSH = reuseSH,
+                usePagedSH = usePagedSH,
                 sourceWidth = fw,
                 sourceHeight = layout.Height,
-                shWidth = shLayout.Width,
-                shHeight = shLayout.Height,
+                shWidth = shLayout.width,
+                shHeight = shLayout.height,
+                shPages = shLayout.pages,
                 boundsPix = boundsPix,
                 boundsWidth = metaW,
                 boundsHeight = metaH * 2,
@@ -330,10 +370,12 @@ namespace GaussianSplatting
             public List<FileRegion> shRegions;
             public bool reuseSrc;
             public bool reuseSH;
+            public bool usePagedSH;
             public int sourceWidth;
             public int sourceHeight;
             public int shWidth;
             public int shHeight;
+            public int shPages;
             public Color[] boundsPix;
             public int boundsWidth;
             public int boundsHeight;
@@ -355,12 +397,14 @@ namespace GaussianSplatting
             readonly FuseLODPlan _plan;
             Stage _stage;
             AsyncConcatReadback _readback;
+            Texture2DArray _shArray;
+            int _shPage;
             public FuseLODResult Result { get; private set; }
             public string Error { get; private set; }
             public bool IsDone => _stage == Stage.Done || _stage == Stage.Failed;
             public bool Failed => _stage == Stage.Failed;
-            public float Progress => Mathf.Clamp01((int)_stage / (float)Stage.Done);  // 0..1 for a progress bar
-            public string StageName => _stage.ToString();                              // current stage, for status text
+            public float Progress => Mathf.Clamp01(((int)_stage + (_stage == Stage.SH && _plan.usePagedSH && !_plan.reuseSH ? _shPage / (float)_plan.shPages : 0f)) / (float)Stage.Done);
+            public string StageName => _stage == Stage.SH && _plan.usePagedSH && !_plan.reuseSH ? $"SH page {_shPage + 1}/{_plan.shPages}" : _stage.ToString();
 
             internal FuseLODJob(FuseLODPlan plan)
             {
@@ -407,7 +451,24 @@ namespace GaussianSplatting
                             return false;
                         case Stage.SH:
                             if (_plan.reuseSH) _stage = Stage.SHParams;
-                            else if (StepReadback(_plan.shWidth, _plan.shHeight, _plan.shRegions, FileAttr.SH, "_LODFusedSH", out Texture2D sh)) { Result.fusedSH = sh; _stage = Stage.SHParams; }
+                            else if (_plan.usePagedSH)
+                            {
+                                if (StepSH()) _stage = Stage.SHParams;
+                            }
+                            else if (StepReadback(_plan.shWidth, _plan.shHeight, _plan.shRegions, FileAttr.SH, "_LODFusedSH", out Texture2D sh))
+                            {
+                                try
+                                {
+                                    sh.Apply(false, true);
+                                    Result.fusedSH = Save(sh, _plan.outFolder + "/" + sh.name + ".asset");
+                                }
+                                catch
+                                {
+                                    if (sh != null) UnityEngine.Object.DestroyImmediate(sh);
+                                    throw;
+                                }
+                                _stage = Stage.SHParams;
+                            }
                             return false;
                         case Stage.SHParams:
                             Result.shParams = MakeTexF(4, _plan.shParamsHeight, _plan.shParamsPix, TextureFormat.RGBAFloat, _plan.assetPrefix + "_LODShParams", _plan.outFolder);
@@ -421,6 +482,8 @@ namespace GaussianSplatting
                     Debug.LogException(e);
                     _readback?.Dispose();
                     _readback = null;
+                    if (_shArray != null) UnityEngine.Object.DestroyImmediate(_shArray);
+                    _shArray = null;
                     _stage = Stage.Failed;
                     return true;
                 }
@@ -429,6 +492,52 @@ namespace GaussianSplatting
 
             bool StepSource(FileAttr attr, string suffix, out Texture2D texture)
                 => StepReadback(_plan.sourceWidth, _plan.sourceHeight, _plan.regions, attr, suffix, out texture);
+
+            bool StepSH()
+            {
+                if (_shArray == null)
+                {
+                    _shArray = new Texture2DArray(_plan.shWidth, _plan.shHeight, _plan.shPages, TextureFormat.BC7, false, true)
+                    {
+                        wrapMode = TextureWrapMode.Clamp,
+                        filterMode = FilterMode.Point,
+                        name = _plan.assetPrefix + "_LODFusedSHArray"
+                    };
+                }
+
+                if (_readback == null)
+                {
+                    int pageTexels = _plan.shWidth * _plan.shHeight;
+                    var pageRegions = new List<FileRegion>();
+                    foreach (FileRegion region in _plan.shRegions)
+                        if (ClipShRegion(region, _shPage, pageTexels, out FileRegion clipped)) pageRegions.Add(clipped);
+                    _readback = AsyncConcatReadback.Start(_plan.shWidth, _plan.shHeight, pageRegions, FileAttr.SH, _shArray.name, _plan.outFolder);
+                    return false;
+                }
+
+                if (!_readback.Step(out Texture2D page)) return false;
+                _readback = null;
+                try
+                {
+                    // Copy compressed CPU data into the array. A GPU-only CopyTexture would not reliably
+                    // populate the serialized asset, and Apply could overwrite the copied GPU contents.
+                    var bytes = page.GetRawTextureData<byte>();
+                    if (bytes.Length != _plan.shWidth * _plan.shHeight)
+                        throw new InvalidOperationException("Unexpected BC7 page size while baking fused SH.");
+                    _shArray.SetPixelData(bytes, 0, _shPage);
+                }
+                finally
+                {
+                    UnityEngine.Object.DestroyImmediate(page);
+                }
+                _shPage++;
+                if (_shPage < _plan.shPages) return false;
+
+                _shArray.Apply(false, true);
+                Result.fusedSHArray = SaveShArray(_shArray, _plan.outFolder + "/" + _shArray.name + ".asset");
+                _shArray = null;
+                return true;
+            }
 
             // Kicks the concat on the first call, then completes once the async readback lands.
             bool StepReadback(int width, int height, List<FileRegion> regions, FileAttr attr, string suffix, out Texture2D texture)
@@ -481,16 +590,27 @@ namespace GaussianSplatting
                 RenderTexture rt = RenderTexture.GetTemporary(width, height, 0, rtFormat, RenderTextureReadWrite.Linear);
                 rt.filterMode = FilterMode.Point;
                 RenderTexture prev = RenderTexture.active;
-                RenderTexture.active = rt;
-                GL.Clear(false, true, new Color(0, 0, 0, 0));
-                for (int i = 0; regions != null && i < regions.Count; i++)
+                try
                 {
-                    Texture2D src = attr == FileAttr.Scale ? regions[i].scale : (attr == FileAttr.SH ? regions[i].pos : PickAttr(regions[i], attr));
-                    if (src == null || regions[i].count <= 0) continue;
-                    BlitRegion(mat, rt, src, regions[i].fusedBase, regions[i].count, regions[i].srcOffset);
+                    RenderTexture.active = rt;
+                    GL.Clear(false, true, new Color(0, 0, 0, 0));
+                    for (int i = 0; regions != null && i < regions.Count; i++)
+                    {
+                        Texture2D src = attr == FileAttr.Scale ? regions[i].scale : (attr == FileAttr.SH ? regions[i].pos : PickAttr(regions[i], attr));
+                        if (src == null || regions[i].count <= 0) continue;
+                        BlitRegion(mat, rt, src, regions[i].fusedBase, regions[i].count, regions[i].srcOffset);
+                    }
+                    return new AsyncConcatReadback(rt, AsyncGPUReadback.Request(rt, 0, readbackFormat), width, height, name, folder, attr);
                 }
-                RenderTexture.active = prev;
-                return new AsyncConcatReadback(rt, AsyncGPUReadback.Request(rt, 0, readbackFormat), width, height, name, folder, attr);
+                catch
+                {
+                    RenderTexture.ReleaseTemporary(rt);
+                    throw;
+                }
+                finally
+                {
+                    RenderTexture.active = prev;
+                }
             }
 
             public bool Step(out Texture2D texture)
@@ -499,7 +619,6 @@ namespace GaussianSplatting
                 if (!_request.done) return false;
                 if (_request.hasError)
                 {
-                    Dispose();
                     throw new InvalidOperationException("Async GPU readback failed while fusing gaussian splat textures.");
                 }
                 if (_attr == FileAttr.Scale)
@@ -510,14 +629,22 @@ namespace GaussianSplatting
                 }
                 else if (_attr == FileAttr.SH)
                 {
-                    // Source SH is <=8-bit quantized, so an RGBA32 -> BC7 fuse is ~lossless at 1 byte/texel; this
-                    // keeps a scene-wide SH set small (it can otherwise reach multiple GB and fail to allocate).
+                    // Compress this page independently, keeping the CPU BC7 bytes for the array asset.
                     var sh = new Texture2D(_width, _height, TextureFormat.RGBA32, false, true) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Point, name = _name };
-                    sh.SetPixels32(_request.GetData<Color32>().ToArray());
-                    sh.Apply(false, false);
-                    EditorUtility.CompressTexture(sh, TextureFormat.BC7, TextureCompressionQuality.Fast);
-                    sh.Apply(false, true);
-                    texture = Save(sh, _folder + "/" + _name + ".asset");
+                    try
+                    {
+                        sh.SetPixels32(_request.GetData<Color32>().ToArray());
+                        sh.Apply(false, false);
+                        EditorUtility.CompressTexture(sh, TextureFormat.BC7, TextureCompressionQuality.Fast);
+                        if (sh.format != TextureFormat.BC7)
+                            throw new InvalidOperationException("BC7 compression failed while baking fused SH.");
+                        texture = sh;
+                    }
+                    catch
+                    {
+                        UnityEngine.Object.DestroyImmediate(sh);
+                        throw;
+                    }
                 }
                 else
                 {
@@ -550,6 +677,21 @@ namespace GaussianSplatting
             public int count;
             public int srcOffset;   // source-texel offset (interleaved SH gathers); 0 for whole-texture regions
             public Texture2D pos, col, rot, scale;
+        }
+
+        // Intersect a global SH gather with one page; both destination and source offsets must be adjusted.
+        internal static bool ClipShRegion(FileRegion region, int pageIndex, int pageTexels, out FileRegion clipped)
+        {
+            if (pageIndex < 0 || pageTexels <= 0) throw new ArgumentOutOfRangeException();
+            long pageStart = (long)pageIndex * pageTexels;
+            long start = Math.Max((long)region.fusedBase, pageStart);
+            long end = Math.Min((long)region.fusedBase + region.count, pageStart + pageTexels);
+            clipped = region;
+            if (end <= start) return false;
+            clipped.fusedBase = checked((int)(start - pageStart));
+            clipped.count = checked((int)(end - start));
+            clipped.srcOffset = checked(region.srcOffset + (int)(start - region.fusedBase));
+            return true;
         }
 
         static Material s_concatMat;
@@ -622,6 +764,14 @@ namespace GaussianSplatting
         static Texture2D Save(Texture2D t, string path)
         {
             var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            if (existing != null) { EditorUtility.CopySerialized(t, existing); UnityEngine.Object.DestroyImmediate(t); return existing; }
+            AssetDatabase.CreateAsset(t, path);
+            return t;
+        }
+
+        static Texture2DArray SaveShArray(Texture2DArray t, string path)
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<Texture2DArray>(path);
             if (existing != null) { EditorUtility.CopySerialized(t, existing); UnityEngine.Object.DestroyImmediate(t); return existing; }
             AssetDatabase.CreateAsset(t, path);
             return t;
