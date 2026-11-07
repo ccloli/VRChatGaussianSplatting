@@ -1166,14 +1166,14 @@ public partial class GaussianSplatCombiner
         // texture's GUID hash) so the fused concatenation order is reproducible across domain reloads.
         // The per-object transform-table row k maps to objs[k] at runtime; an InstanceID sort is NOT
         // stable across reloads and would break the reload-from-disk fast path.
-        int sig = 20; // cheap content signature: object set + source textures + chunk/splat counts.
-                      // Bump the seed on fused-metadata FORMAT changes so old bakes regenerate once instead of
-                      // being reused via the fast path.
+        // Bump sig for metadata changes, and both seeds for source encoding changes, to invalidate old bakes.
+        // The BC7 Best encoder needs a one-time rebake even when the imported textures are unchanged.
+        int sig = 22; // cheap content signature: object set + source textures + chunk/splat counts.
 
         // Source signature: hashes ONLY what the heavy fused source textures depend on - each UNIQUE source once
         // (instances dedup). Stable when a duplicate is added/removed, so the ~GB GPU source concat is skipped and
         // only the metadata rebuilds. (sig, per placement, remains the LAYOUT signature gating the fast-path reload.)
-        int sourceSig = 17;
+        int sourceSig = 19;
         var sourceSigSeen = new HashSet<Texture2D>();
 
         var valid = new List<GaussianSplatObject>();

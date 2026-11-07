@@ -510,12 +510,12 @@ namespace GaussianSplatting
                 }
                 else if (_attr == FileAttr.SH)
                 {
-                    // Source SH is <=8-bit quantized, so an RGBA32 -> BC7 fuse is ~lossless at 1 byte/texel; this
-                    // keeps a scene-wide SH set small (it can otherwise reach multiple GB and fail to allocate).
+                    // BC7 keeps scene-wide SH at 1 byte/texel. Fast compression can introduce visible
+                    // view-dependent color errors; Best reduces them without increasing runtime texture size.
                     var sh = new Texture2D(_width, _height, TextureFormat.RGBA32, false, true) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Point, name = _name };
                     sh.SetPixels32(_request.GetData<Color32>().ToArray());
                     sh.Apply(false, false);
-                    EditorUtility.CompressTexture(sh, TextureFormat.BC7, TextureCompressionQuality.Fast);
+                    EditorUtility.CompressTexture(sh, TextureFormat.BC7, TextureCompressionQuality.Best);
                     sh.Apply(false, true);
                     texture = Save(sh, _folder + "/" + _name + ".asset");
                 }
