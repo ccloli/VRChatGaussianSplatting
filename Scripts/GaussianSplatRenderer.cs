@@ -69,10 +69,14 @@ public partial class GaussianSplatRenderer : UdonSharpBehaviour
 
     [HideInInspector, SerializeField] GameObject[] cachedSceneLODObjects;
     [SerializeField] GaussianSplatCombiner combiner;
-    [Tooltip("Combined LOD splat cap for PC builds. 0 disables the cap.")]
+    [Tooltip("PC preset LOD cap. Quality presets and startup capacity use fractions of this value. 0 disables the cap.")]
     [SerializeField] int combinedLodSplatBudgetPC = DEFAULT_COMBINED_LOD_SPLAT_BUDGET_PC;
-    [Tooltip("Combined LOD splat cap for Android builds. 0 disables the cap.")]
+    [Tooltip("Android preset LOD cap. Quality presets and startup capacity use fractions of this value. 0 disables the cap.")]
     [SerializeField] int combinedLodSplatBudgetAndroid = DEFAULT_COMBINED_LOD_SPLAT_BUDGET_ANDROID;
+    [Tooltip("PC advanced LOD slider maximum. 0 inherits the preset cap; smaller values cannot lower it. Maximum 16,777,216.")]
+    [SerializeField] int combinedLodGlobalSplatBudgetPC;
+    [Tooltip("Android advanced LOD slider maximum. 0 inherits the preset cap; smaller values cannot lower it. Maximum 16,777,216.")]
+    [SerializeField] int combinedLodGlobalSplatBudgetAndroid;
     [SerializeField] int requestedCombinedLodSplatBudget;
     [Tooltip("GPU LOD selection target as a fraction of the active LOD cap. Lower values leave headroom for alpha solver overshoot.")]
     [SerializeField] float combinedLodTargetScale = DEFAULT_COMBINED_LOD_TARGET_SCALE;
@@ -82,7 +86,7 @@ public partial class GaussianSplatRenderer : UdonSharpBehaviour
     [SerializeField] float lodMaxSplatsPerPixel = 0.5f;
     [Tooltip("Quality preset applied once at world start. 'Keep Inspector Settings' (-1) uses the Startup LOD Capacity fraction below instead of applying a preset.")]
     [SerializeField] int startupQualityPreset = -1;
-    [Tooltip("Startup LOD capacity as a fraction of THIS platform's cap (scales per-platform). Used when Startup Quality is 'Keep Inspector Settings'. 1 = full cap.")]
+    [Tooltip("Startup LOD capacity as a fraction of this platform's preset cap. Used when Startup Quality is 'Keep Inspector Settings'. 1 = full preset cap.")]
     [Range(0.0f, 1.0f)] [SerializeField] float startupLodCapacity = 1.0f;
     [HideInInspector, SerializeField] int combinedLodSettingsVersion;
     [Tooltip("Editor-only preview that recolors combined LOD splats by the currently selected GPU LOD.")]
@@ -544,21 +548,35 @@ public partial class GaussianSplatRenderer : UdonSharpBehaviour
 
     public int GetCombinedLodSplatBudgetPC() { return Mathf.Max(0, combinedLodSplatBudgetPC); }
     public int GetCombinedLodSplatBudgetAndroid() { return Mathf.Max(0, combinedLodSplatBudgetAndroid); }
-    public int GetCombinedLodSplatBudgetSliderMin()
+    public int GetCombinedLodSplatBudgetSliderMaxPC()
     {
-        // Fixed 64K floor (not min(Android, PC)), clamped to the platform cap so min never exceeds max.
-        return Mathf.Min(MIN_COMBINED_LOD_SPLAT_BUDGET, GetCombinedLodSplatBudgetSliderMax());
+        return Mathf.Max(GetCombinedLodSplatBudgetPC(), Mathf.Clamp(combinedLodGlobalSplatBudgetPC, 0, MAX_COMBINED_SPLAT_COUNT));
     }
-
-    public int GetCombinedLodSplatBudgetSliderMax()
+    public int GetCombinedLodSplatBudgetSliderMaxAndroid()
     {
-        // The ceiling is THIS platform's cap, not max(Android, PC): the slider's upper bound and
-        // ClampCombinedLodSplatBudgetToSliderRange both read this, so using the larger cap let an Android
-        // build's runtime slider exceed its own cap (up to the PC cap). Matches GetEffectiveCombinedLodSplatBudget.
+        return Mathf.Max(GetCombinedLodSplatBudgetAndroid(), Mathf.Clamp(combinedLodGlobalSplatBudgetAndroid, 0, MAX_COMBINED_SPLAT_COUNT));
+    }
+    int GetCombinedLodPresetSplatBudget()
+    {
 #if UNITY_ANDROID && !UNITY_EDITOR
         return GetCombinedLodSplatBudgetAndroid();
 #else
         return GetCombinedLodSplatBudgetPC();
+#endif
+    }
+    public int GetCombinedLodSplatBudgetSliderMin()
+    {
+        // Preserve the old floor even for preset caps below 64K. A zero preset cap keeps no-cap selectable.
+        return Mathf.Min(MIN_COMBINED_LOD_SPLAT_BUDGET, GetCombinedLodPresetSplatBudget());
+    }
+
+    public int GetCombinedLodSplatBudgetSliderMax()
+    {
+        // The advanced ceiling is independent for each platform and cannot lower its preset cap.
+#if UNITY_ANDROID && !UNITY_EDITOR
+        return GetCombinedLodSplatBudgetSliderMaxAndroid();
+#else
+        return GetCombinedLodSplatBudgetSliderMaxPC();
 #endif
     }
 
@@ -740,10 +758,9 @@ public partial class GaussianSplatRenderer : UdonSharpBehaviour
     }
     int GetCombinedLodSplatBudgetAtQuality(float quality)
     {
-        // A quality/capacity fraction maps to that exact fraction of THIS platform's cap (the presets use
-        // 1/4, 2/4, 3/4, 4/4 of the cap), floored at the 64K slider minimum. Scales per-platform.
-        int max = GetCombinedLodSplatBudgetSliderMax();
-        return Mathf.Clamp(Mathf.RoundToInt(Mathf.Clamp01(quality) * max), GetCombinedLodSplatBudgetSliderMin(), max);
+        // Presets and startup capacity use the original cap, independent of the advanced ceiling.
+        int presetCap = GetCombinedLodPresetSplatBudget();
+        return Mathf.Clamp(Mathf.RoundToInt(Mathf.Clamp01(quality) * presetCap), Mathf.Min(MIN_COMBINED_LOD_SPLAT_BUDGET, presetCap), presetCap);
     }
 
     void ApplyQualityPreset(float cull, float cutoff, float lodQuality)

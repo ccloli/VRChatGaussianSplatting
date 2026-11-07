@@ -814,6 +814,8 @@ public partial class GaussianSplatRenderer
         startRenderQueue = Mathf.Clamp(startRenderQueue, 2000, 5000);
         combinedLodSplatBudgetPC = Mathf.Max(0, combinedLodSplatBudgetPC);
         combinedLodSplatBudgetAndroid = Mathf.Max(0, combinedLodSplatBudgetAndroid);
+        combinedLodGlobalSplatBudgetPC = Mathf.Clamp(combinedLodGlobalSplatBudgetPC, 0, MAX_COMBINED_SPLAT_COUNT);
+        combinedLodGlobalSplatBudgetAndroid = Mathf.Clamp(combinedLodGlobalSplatBudgetAndroid, 0, MAX_COMBINED_SPLAT_COUNT);
         MigrateEditorSerializedDefaults();
         combinedLodTargetScale = combinedLodTargetScale > 0.0f ? Mathf.Clamp(combinedLodTargetScale, 0.1f, 1.0f) : DEFAULT_COMBINED_LOD_TARGET_SCALE;
         combinedLodDirectionalBias = combinedLodDirectionalBias > 0.0f ? Mathf.Clamp(combinedLodDirectionalBias, 1.0f, 16.0f) : DEFAULT_COMBINED_LOD_DIRECTIONAL_BIAS;
@@ -948,6 +950,16 @@ public partial class GaussianSplatRenderer
         return Mathf.Min(MAX_COMBINED_SPLAT_COUNT, Mathf.Max(0, thinnable));
     }
 
+    // Prepare for either build target. A zero preset cap keeps the legacy unbudgeted mode reachable.
+    internal int GetMaximumReachableCombinedLodSplatBudget()
+    {
+        if (GetCombinedLodSplatBudgetPC() == 0 || GetCombinedLodSplatBudgetAndroid() == 0)
+        {
+            return 0;
+        }
+        return Mathf.Max(GetCombinedLodSplatBudgetSliderMaxPC(), GetCombinedLodSplatBudgetSliderMaxAndroid());
+    }
+
 
     void UpdateSortingResourceTextures()
     {
@@ -964,10 +976,10 @@ public partial class GaussianSplatRenderer
             {
                 continue;
             }
-            thinnableSum += lodObject.GetMaxLOD0SplatCount();
+            thinnableSum += Mathf.Min(MAX_COMBINED_SPLAT_COUNT - thinnableSum, Mathf.Max(0, lodObject.GetMaxLOD0SplatCount()));
         }
-        // Max splats the scene can ever render = min(thinnableSum, highest-quality budget).
-        int maxReachableTotal = ComputeCombinedTierCount(thinnableSum, GetCombinedLodSplatBudgetAtQuality(1.0f));
+        // Cover both platforms' advanced ceilings, or the full scene when either platform has no cap.
+        int maxReachableTotal = ComputeCombinedTierCount(thinnableSum, GetMaximumReachableCombinedLodSplatBudget());
         if (maxReachableTotal <= 0)
         {
             return;
