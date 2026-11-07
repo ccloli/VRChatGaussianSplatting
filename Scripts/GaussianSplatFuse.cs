@@ -275,7 +275,14 @@ namespace GaussianSplatting
 
             if (shDroppedObjects > 0)
             {
-                Debug.LogWarning($"[GaussianSplatFuse] Scene spherical harmonics ({shRequestedTexels:N0} texels) exceed the {(usePagedSH ? "paged" : "single-texture")} fused SH limit ({shAddressLimit:N0}); SH was dropped for {shDroppedObjects} source(s), which now render without view-dependent color. {(usePagedSH ? "Lower the SH band, reduce splat counts, or split the scene." : "Enable Paged Fused SH in the renderer, lower the SH band, reduce splat counts, or split the scene.")}");
+                string limitType = usePagedSH ? GSEditorText.T("paged", "ページ分割", "分页") : GSEditorText.T("single-texture", "単一テクスチャ", "单纹理");
+                string remedy = usePagedSH
+                    ? GSEditorText.T("Lower the SH band, reduce splat counts, or split the scene.", "SH バンドを下げる、スプラット数を減らす、またはシーンを分割してください。", "请降低 SH 阶数、减少 Splat 数量或拆分场景。")
+                    : GSEditorText.T("Enable Paged Fused SH in the renderer, lower the SH band, reduce splat counts, or split the scene.", "レンダラーでページ分割 SH を有効にする、SH バンドを下げる、スプラット数を減らす、またはシーンを分割してください。", "请在渲染器中启用分页融合 SH、降低 SH 阶数、减少 Splat 数量或拆分场景。");
+                Debug.LogWarning(GSEditorText.T(
+                    $"[GaussianSplatFuse] Scene spherical harmonics ({shRequestedTexels:N0} texels) exceed the {limitType} fused SH limit ({shAddressLimit:N0}); SH was dropped for {shDroppedObjects} source(s), which now render without view-dependent color. {remedy}",
+                    $"[GaussianSplatFuse] シーンの球面調和 ({shRequestedTexels:N0} テクセル) が {limitType} 統合 SH の上限 ({shAddressLimit:N0}) を超えたため、{shDroppedObjects} 個のソースの SH が破棄され、視点依存色なしで描画されます。{remedy}",
+                    $"[GaussianSplatFuse] 场景球谐数据（{shRequestedTexels:N0} 个纹素）超过{limitType}融合 SH 上限（{shAddressLimit:N0}），已丢弃 {shDroppedObjects} 个源的 SH 数据；这些源将不带视角相关颜色渲染。{remedy}"));
             }
 
             FuseLODResult res = new FuseLODResult { totalSourceCount = fusedCursor, totalChunkCount = totalChunks, fileCount = globalFileId, objectCount = lod.Count, shDroppedObjects = shDroppedObjects,
@@ -316,7 +323,15 @@ namespace GaussianSplatting
             ShPageLayout shLayout = ChooseShPageLayout(shCursor, usePagedSH ? FusedShPageDimension : 16384);
             if (shLayout.width > SystemInfo.maxTextureSize || shLayout.height > SystemInfo.maxTextureSize
                 || (usePagedSH && (!SystemInfo.supports2DArrayTextures || shLayout.pages > SystemInfo.maxTextureArraySlices)))
-                throw new InvalidOperationException($"Fused SH requires a {shLayout.width}x{shLayout.height} {(usePagedSH ? "texture array with " + shLayout.pages + " slice(s)" : "texture")}, which this editor GPU does not support.");
+            {
+                string textureType = usePagedSH
+                    ? GSEditorText.T("texture array with " + shLayout.pages + " slice(s)", shLayout.pages + " スライスのテクスチャ配列", shLayout.pages + " 层的纹理数组")
+                    : GSEditorText.T("texture", "テクスチャ", "纹理");
+                throw new InvalidOperationException(GSEditorText.T(
+                    $"Fused SH requires a {shLayout.width}x{shLayout.height} {textureType}, which this editor GPU does not support.",
+                    $"統合 SH には {shLayout.width}x{shLayout.height} の{textureType}が必要ですが、このエディタの GPU は対応していません。",
+                    $"融合 SH 需要 {shLayout.width}×{shLayout.height} 的{textureType}，当前编辑器使用的 GPU 不支持该资源。"));
+            }
             bool reuseSH = reuseSrc && (usePagedSH
                 ? reuseFrom.fusedSHArray != null && reuseFrom.fusedSHArray.width == shLayout.width && reuseFrom.fusedSHArray.height == shLayout.height && reuseFrom.fusedSHArray.depth == shLayout.pages
                 : reuseFrom.fusedSH != null && reuseFrom.fusedSH.width == shLayout.width && reuseFrom.fusedSH.height == shLayout.height);
@@ -404,7 +419,30 @@ namespace GaussianSplatting
             public bool IsDone => _stage == Stage.Done || _stage == Stage.Failed;
             public bool Failed => _stage == Stage.Failed;
             public float Progress => Mathf.Clamp01(((int)_stage + (_stage == Stage.SH && _plan.usePagedSH && !_plan.reuseSH ? _shPage / (float)_plan.shPages : 0f)) / (float)Stage.Done);
-            public string StageName => _stage == Stage.SH && _plan.usePagedSH && !_plan.reuseSH ? $"SH page {_shPage + 1}/{_plan.shPages}" : _stage.ToString();
+            public string StageName
+            {
+                get
+                {
+                    switch (_stage)
+                    {
+                        case Stage.Positions: return GSEditorText.T("Positions", "位置", "位置");
+                        case Stage.Colors: return GSEditorText.T("Colors", "色", "颜色");
+                        case Stage.Rotations: return GSEditorText.T("Rotations", "回転", "旋转");
+                        case Stage.Scales: return GSEditorText.T("Scales", "スケール", "缩放");
+                        case Stage.Bounds: return GSEditorText.T("Bounds", "境界", "边界");
+                        case Stage.Range: return GSEditorText.T("Range", "範囲", "范围");
+                        case Stage.FileBase: return GSEditorText.T("File Base", "ファイルベース", "文件基址");
+                        case Stage.SH:
+                            return _plan.usePagedSH && !_plan.reuseSH
+                                ? GSEditorText.T($"SH page {_shPage + 1}/{_plan.shPages}", $"SH ページ {_shPage + 1}/{_plan.shPages}", $"SH 页面 {_shPage + 1}/{_plan.shPages}")
+                                : "SH";
+                        case Stage.SHParams: return GSEditorText.T("SH Parameters", "SH パラメーター", "SH 参数");
+                        case Stage.Done: return GSEditorText.T("Done", "完了", "完成");
+                        case Stage.Failed: return GSEditorText.T("Failed", "失敗", "失败");
+                        default: return _stage.ToString();
+                    }
+                }
+            }
 
             internal FuseLODJob(FuseLODPlan plan)
             {
@@ -523,7 +561,7 @@ namespace GaussianSplatting
                     // populate the serialized asset, and Apply could overwrite the copied GPU contents.
                     var bytes = page.GetRawTextureData<byte>();
                     if (bytes.Length != _plan.shWidth * _plan.shHeight)
-                        throw new InvalidOperationException("Unexpected BC7 page size while baking fused SH.");
+                        throw new InvalidOperationException(GSEditorText.T("Unexpected BC7 page size while baking fused SH.", "統合 SH のベイク中に BC7 ページサイズが想定と異なりました。", "烘焙融合 SH 时，BC7 页面的大小不符合预期。"));
                     _shArray.SetPixelData(bytes, 0, _shPage);
                 }
                 finally
@@ -637,7 +675,7 @@ namespace GaussianSplatting
                         sh.Apply(false, false);
                         EditorUtility.CompressTexture(sh, TextureFormat.BC7, TextureCompressionQuality.Best);
                         if (sh.format != TextureFormat.BC7)
-                            throw new InvalidOperationException("BC7 compression failed while baking fused SH.");
+                            throw new InvalidOperationException(GSEditorText.T("BC7 compression failed while baking fused SH.", "統合 SH のベイク中に BC7 圧縮に失敗しました。", "烘焙融合 SH 时，BC7 压缩失败。"));
                         texture = sh;
                     }
                     catch

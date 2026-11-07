@@ -165,7 +165,7 @@ namespace GaussianSplatting.Editor
             {
                 EditorGUI.showMixedValue = _combinedLodSplatBudgetPC.hasMultipleDifferentValues;
                 EditorGUI.BeginChangeCheck();
-                int nextPcBudget = EditorGUILayout.IntField(GSEditorText.T("LOD PC Preset Cap", "LOD PC プリセット上限"), _combinedLodSplatBudgetPC.intValue);
+                int nextPcBudget = EditorGUILayout.IntField(GSEditorText.T("LOD PC Preset Cap", "LOD PC プリセット上限", "LOD PC 预设上限"), _combinedLodSplatBudgetPC.intValue);
                 if (EditorGUI.EndChangeCheck())
                 {
                     _combinedLodSplatBudgetPC.intValue = Mathf.Max(0, nextPcBudget);
@@ -176,18 +176,19 @@ namespace GaussianSplatting.Editor
             {
                 EditorGUI.showMixedValue = _combinedLodSplatBudgetAndroid.hasMultipleDifferentValues;
                 EditorGUI.BeginChangeCheck();
-                int nextAndroidBudget = EditorGUILayout.IntField(GSEditorText.T("LOD Android Preset Cap", "LOD Android プリセット上限"), _combinedLodSplatBudgetAndroid.intValue);
+                int nextAndroidBudget = EditorGUILayout.IntField(GSEditorText.T("LOD Android Preset Cap", "LOD Android プリセット上限", "LOD Android 预设上限"), _combinedLodSplatBudgetAndroid.intValue);
                 if (EditorGUI.EndChangeCheck())
                 {
                     _combinedLodSplatBudgetAndroid.intValue = Mathf.Max(0, nextAndroidBudget);
                 }
                 EditorGUI.showMixedValue = false;
             }
-            DrawGlobalLodCap(_combinedLodGlobalSplatBudgetPC, GSEditorText.T("LOD PC Global Cap", "LOD PC 全体上限"));
-            DrawGlobalLodCap(_combinedLodGlobalSplatBudgetAndroid, GSEditorText.T("LOD Android Global Cap", "LOD Android 全体上限"));
+            DrawGlobalLodCap(_combinedLodGlobalSplatBudgetPC, GSEditorText.T("LOD PC Global Cap", "LOD PC 全体上限", "LOD PC 全局上限"));
+            DrawGlobalLodCap(_combinedLodGlobalSplatBudgetAndroid, GSEditorText.T("LOD Android Global Cap", "LOD Android 全体上限", "LOD Android 全局上限"));
             EditorGUILayout.HelpBox(GSEditorText.T(
                 "Preset caps set the quality tiers and startup capacity; 0 means no cap, even when a global cap is set. Global caps set the advanced slider maximum; 0 inherits the preset cap, and a smaller value cannot lower it. The combined renderer supports up to 16,777,216 splats.",
-                "プリセット上限は品質と起動時容量を設定し、0 は全体上限の設定に関わらず上限なしです。全体上限は詳細設定スライダーの最大値で、0 はプリセット上限を継承し、小さい値では上限を下げません。統合レンダラーは最大 16,777,216 スプラットに対応します。"), MessageType.None);
+                "プリセット上限は品質と起動時容量を設定し、0 は全体上限の設定に関わらず上限なしです。全体上限は詳細設定スライダーの最大値で、0 はプリセット上限を継承し、小さい値では上限を下げません。統合レンダラーは最大 16,777,216 スプラットに対応します。",
+                "预设上限决定画质档位和启动容量；即使设置了全局上限，0 仍表示无上限。全局上限决定高级设置中滑块的最大值；0 表示沿用预设上限，小于预设上限的值不会降低上限。合并渲染器最多支持 16,777,216 个 Splat。"), MessageType.None);
             if (_combinedLodTargetScale != null)
             {
                 EditorGUI.showMixedValue = _combinedLodTargetScale.hasMultipleDifferentValues;
@@ -253,7 +254,7 @@ namespace GaussianSplatting.Editor
                     int presetCap = sceneRenderer.GetCombinedLodSplatBudgetPC();
                     int resolved = Mathf.Clamp(Mathf.RoundToInt(Mathf.Clamp01(_startupLodCapacity.floatValue) * presetCap), sliderMin, presetCap);
                     string resolvedText = resolved == 0 ? GSEditorText.T("No cap", "上限なし", "无上限") : resolved.ToString("N0");
-                    EditorGUILayout.LabelField(" ", GSEditorText.T("= " + resolvedText + " (PC preset cap)", "= " + resolvedText + " (PC プリセット上限)"));
+                    EditorGUILayout.LabelField(" ", GSEditorText.T("= " + resolvedText + " (PC preset cap)", "= " + resolvedText + " (PC プリセット上限)", "= " + resolvedText + "（PC 预设上限）"));
                 }
                 int effectiveBudget = sceneRenderer.GetEffectiveCombinedLodSplatBudget();
                 int targetBudget = effectiveBudget > 0 ? Mathf.FloorToInt(effectiveBudget * sceneRenderer.GetEffectiveCombinedLodTargetScale()) : 0;
@@ -261,7 +262,8 @@ namespace GaussianSplatting.Editor
                 string target = effectiveBudget == 0 ? GSEditorText.T("No cap", "上限なし", "无上限") : targetBudget.ToString();
                 EditorGUILayout.HelpBox(GSEditorText.T(
                     "Editor previews use the PC preset cap. Android builds use the Android preset cap. Effective cap: " + effective + ". LOD selection target: " + target + ".",
-                    "エディタプレビューでは PC プリセット上限を使用します。Android ビルドでは Android プリセット上限を使用します。現在の上限: " + effective + "。LOD 選択目標: " + target + "。"), MessageType.None);
+                    "エディタプレビューでは PC プリセット上限を使用します。Android ビルドでは Android プリセット上限を使用します。現在の上限: " + effective + "。LOD 選択目標: " + target + "。",
+                    "编辑器预览使用 PC 预设上限，Android 构建使用 Android 预设上限。当前上限：" + effective + "。LOD 选择目标：" + target + "。"), MessageType.None);
             }
         }
 
@@ -296,15 +298,17 @@ namespace GaussianSplatting.Editor
         void DrawMaterialSettings()
         {
             EditorGUILayout.IntSlider(_requestedSHBand, 0, 3, GSEditorText.C("Requested SH Band", "要求 SH バンド", "请求的 SH 阶数"));
-            GUIContent pagedLabel = GSEditorText.C("Paged Fused SH (Experimental)", "ページ分割 SH (実験的)");
+            GUIContent pagedLabel = GSEditorText.C("Paged Fused SH (Experimental)", "ページ分割 SH (実験的)", "分页融合 SH（实验性）");
             pagedLabel.tooltip = GSEditorText.T("May use more memory and requires texture-array support on the target device. Changing this rebakes SH.",
-                "メモリ使用量が増える可能性があり、端末がテクスチャ配列に対応している必要があります。変更すると SH を再ベイクします。");
+                "メモリ使用量が増える可能性があり、端末がテクスチャ配列に対応している必要があります。変更すると SH を再ベイクします。",
+                "可能增加内存占用，且目标设备必须支持纹理数组。更改此设置会重新烘焙 SH。");
             using (new EditorGUI.DisabledScope(Application.isPlaying))
                 EditorGUILayout.PropertyField(_usePagedFusedSH, pagedLabel);
             if (_usePagedFusedSH.boolValue)
                 EditorGUILayout.HelpBox(GSEditorText.T(
                     "Editor bake setting: SH is stored in an array of up to 8K pages. Changing this rebakes SH. Array support and memory use depend on the target device; the last page may be partly unused.",
-                    "エディタのベイク設定: SH を最大 8K のページ配列に保存します。変更すると SH を再ベイクします。配列の対応状況とメモリ使用量は端末に依存し、最後のページに未使用領域が生じる場合があります。"), MessageType.Warning);
+                    "エディタのベイク設定: SH を最大 8K のページ配列に保存します。変更すると SH を再ベイクします。配列の対応状況とメモリ使用量は端末に依存し、最後のページに未使用領域が生じる場合があります。",
+                    "编辑器烘焙设置：将 SH 存储在由最大 8K × 8K 页面组成的纹理数组中。更改此设置会重新烘焙 SH。纹理数组支持情况和内存占用取决于目标设备；最后一页可能有未使用空间。"), MessageType.Warning);
             if (!serializedObject.isEditingMultipleObjects && target is GaussianSplatRenderer shRenderer)
             {
                 GaussianSplatCombiner shCombiner = shRenderer.GetCombiner();
@@ -317,14 +321,15 @@ namespace GaussianSplatting.Editor
                             $"Spherical harmonics were dropped for {droppedSh} object(s): the scene's total SH exceeds the single fused SH texture cap (16384² texels). Those splats render without view-dependent color regardless of this setting. Lower the SH band on some splats, reduce splat counts, or split the scene.",
                             $"{droppedSh} 個のオブジェクトの球面調和が破棄されました: シーン全体の SH が単一の統合 SH テクスチャ上限 (16384² テクセル) を超えています。該当スプラットはこの設定に関わらず視点依存色なしで描画されます。一部スプラットの SH バンドを下げる、スプラット数を減らす、またはシーンを分割してください。",
                             $"{droppedSh} 个对象的球谐数据已被丢弃：场景 SH 总量超过单张融合 SH 纹理的上限（16384² 纹素）。这些 Splat 无论此设置为何值，都将不带视角相关颜色渲染。请降低部分 Splat 的 SH 阶数、减少 Splat 数量或拆分场景。")
-                            + (_usePagedFusedSH.boolValue ? "" : "\nEnable Paged Fused SH to increase the limit."),
+                            + (_usePagedFusedSH.boolValue ? "" : GSEditorText.T("\nEnable Paged Fused SH to increase the limit.", "\nページ分割 SH を有効にすると上限を増やせます。", "\n启用分页融合 SH 可提高上限。")),
                             MessageType.Warning);
                     }
                     else
                     {
                         EditorGUILayout.HelpBox(GSEditorText.T(
                             $"Spherical harmonics were dropped for {droppedSh} source(s): the fused SH address limit was exceeded. Those splats render without view-dependent color regardless of this setting. Lower the SH band, reduce splat counts, or split the scene.",
-                            $"{droppedSh} 個のソースの球面調和が破棄されました: 統合 SH のアドレス上限を超えています。該当スプラットは視点依存色なしで描画されます。SH バンドを下げる、スプラット数を減らす、またはシーンを分割してください。"),
+                            $"{droppedSh} 個のソースの球面調和が破棄されました: 統合 SH のアドレス上限を超えています。該当スプラットは視点依存色なしで描画されます。SH バンドを下げる、スプラット数を減らす、またはシーンを分割してください。",
+                            $"因超过融合 SH 的寻址上限，已丢弃 {droppedSh} 个源的球谐数据。这些 Splat 不受此设置影响，将不带视角相关颜色渲染。请降低 SH 阶数、减少 Splat 数量或拆分场景。"),
                             MessageType.Warning);
                     }
                 }
@@ -428,7 +433,7 @@ namespace GaussianSplatting.Editor
                 {
                     int band = r.shCoeff >= 15 ? 3 : (r.shCoeff >= 8 ? 2 : (r.shCoeff >= 3 ? 1 : 0));
                     string shTex = r.shCoeff > 0 ? $"{r.shTexels:N0} ({(cap > 0 ? 100.0 * r.shTexels / cap : 0):F1}%)" : "-";
-                    string flag = r.shDropped ? GSEditorText.T("DROPPED", "破棄", "已丢弃") : (r.sharedSource ? "shared" : (r.shCoeff > 0 ? "" : GSEditorText.T("no SH", "SH なし", "无 SH")));
+                    string flag = r.shDropped ? GSEditorText.T("DROPPED", "破棄", "已丢弃") : (r.sharedSource ? GSEditorText.T("shared", "共有", "共享") : (r.shCoeff > 0 ? "" : GSEditorText.T("no SH", "SH なし", "无 SH")));
                     DrawFusedTableRow(r.name, r.active ? GSEditorText.T("yes", "はい", "是") : GSEditorText.T("no", "いいえ", "否"), $"{r.splats:N0}", r.files.ToString(), r.chunks.ToString(), band.ToString(), shTex, flag, cell);
                 }
             }
