@@ -69,7 +69,7 @@ namespace GaussianSplatting
             public Vector4 range;
             public BigFloatBuffer store;   // raw f_rest, indexed by stable sourceIndex
             public Texture2D[] textures;   // per texture-set SH texture, filled as sets are saved
-            public GaussianSplatImporter.SHCompression compression;   // SH texture format (None/BC1/BC7)
+            public GaussianSplatImporter.SHCompression compression;   // SH texture output format
             public bool compressColor;     // BC7 the color/alpha texture (shared with the non-LOD path)
 
             // Flat-store base for a source splat, or -1 for synthetic (merged) / SH-less splats.
@@ -112,8 +112,8 @@ namespace GaussianSplatting
             readonly List<Color32> _rotationLinear;
             readonly List<Color> _scaleLinear;
 
-            // Raw quantized SH stored splat-major during accumulation ([splat*coeffCount + coeff]); remapped to the
-            // file's coeff-major layout (coeff*count + localIndex) at Save(). RGB565 with the import-shared range.
+            // SH normalized with the import-shared range, stored splat-major during accumulation
+            // ([splat*coeffCount + coeff]) and remapped to coeff-major layout at Save().
             readonly int _shCoeffCount;
             readonly Vector4 _shMin;
             readonly Vector4 _shRange;
@@ -250,9 +250,7 @@ namespace GaussianSplatting
                     for (int i = 0; i < _count; i++)
                         for (int coeff = 0; coeff < _shCoeffCount; coeff++)
                             shPix[GaussianSplatImporter.ComputePackedTextureIndex(coeff * _count + i, sw)] = _shLinear[i * _shCoeffCount + coeff];
-                    SHTexture = NewTexture(shLayout.Width, shLayout.Height, TextureFormat.RGB565, setName + "_sh");
-                    SHTexture.SetPixels(shPix);
-                    GaussianSplatImporter.ApplyShTextureCompression(SHTexture, _shCompression);   // shared SH None/BC1/BC7 (matches non-LOD)
+                    SHTexture = GaussianSplatImporter.CreateShTexture(shLayout.Width, shLayout.Height, setName + "_sh", shPix, _shCompression);
                     SHTexture = GaussianSplatImporter.CreateOrReplaceAsset(SHTexture, _dataFolder + "/" + SHTexture.name + ".asset");
                 }
             }

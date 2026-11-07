@@ -56,13 +56,14 @@ Gaussian splatting for VRChat worlds: runtime camera-sorted rendering through Ud
 **All modes:**
 - `Compute Bounding Box`
 - `Import Spherical Harmonics` + `Max SH Band` — memory scales with the chosen band; disabled forces SH0.
-- `SH Compression` — `None` (RGB565), `BC1` (4 bpp), or `BC7` (8 bpp).
+- `SH Compression` — `RGBA32` (32 bpp), `RGB565` (16 bpp), `BC7` (8 bpp), or `BC1` (4 bpp). SH starts at 8-bit RGB precision before conversion to the selected format.
 - `Compress Color+Alpha to BC7`
 - **Transform / cleanup**: `Crop To Bounds` (preview box handle), `Horizon Alignment` / `Wall Alignment` (pick points in the preview), `Normalize Size` (scale the floater-robust extent to a target size).
 
 **Combined (LOD) mode:**
 - `Chunk Size` — combined-render chunk size.
 - `LOD Resampling Rate` / `LOD Reused Splats` — tune the LOD pyramid's stored-splat count.
+- Scene-wide SH is fused using high-quality BC7 regardless of the import compression setting. This reduces view-dependent color errors at the cost of longer fusion. Reimport existing LOD splats to apply the higher-precision SH import.
 
 **Standalone rendering only** (combined splats render through the combiner and ignore these):
 - `sRGB Color Correction` — the exact color/compositing path (two grab passes, needs HDR camera targets). **Forced off on Android.** See [Color reproduction & sRGB](#color-reproduction--srgb).
@@ -277,13 +278,14 @@ VRChat ワールド向けのガウシアンスプラッティング：Udon に�
 **全モード：**
 - `Compute Bounding Box`
 - `Import Spherical Harmonics` + `Max SH Band` — メモリは選択したバンドに比例。無効化で SH0 を強制。
-- `SH Compression` — `None`（RGB565）、`BC1`（4 bpp）、`BC7`（8 bpp）。
+- `SH Compression` — `RGBA32`（32 bpp）、`RGB565`（16 bpp）、`BC7`（8 bpp）、`BC1`（4 bpp）。SH は RGB 各 8 ビットの精度から、選択した形式に変換されます。
 - `Compress Color+Alpha to BC7`
 - **変換／クリーンアップ**：`Crop To Bounds`（プレビューのボックスハンドル）、`Horizon Alignment` / `Wall Alignment`（プレビューで点を選択）、`Normalize Size`（外れ値に強い範囲を目標サイズへスケール）。
 
 **統合（LOD）モード：**
 - `Chunk Size` — 統合レンダリングのチャンクサイズ。
 - `LOD Resampling Rate` / `LOD Reused Splats` — LOD ピラミッドの保存スプラット数を調整。
+- シーン全体の SH は、インポート時の圧縮設定にかかわらず高品質の BC7 で統合されます。統合に時間がかかりますが、視点依存の色誤差が減ります。高精度の SH インポートを適用するには、既存の LOD スプラットを再インポートしてください。
 
 **Standalone レンダリングのみ**（統合スプラットはコンバイナー経由でレンダリングされ、これらを無視する）：
 - `sRGB Color Correction` — 厳密な色／合成パス（2 つの grab パス、HDR カメラターゲットが必要）。**Android では強制オフ。** [色再現と sRGB](#色再現と-srgb) を参照。
