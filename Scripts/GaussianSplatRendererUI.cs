@@ -893,7 +893,7 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
     string FormatFloat(float value) { return (Mathf.Round(value * 10000.0f) * 0.0001f).ToString("0.####"); }
     string ToggleLabel(bool enabled) { return Localize(enabled ? "On" : "Off", enabled ? "オン" : "オフ", enabled ? "开启" : "关闭"); }
     string AdvancedSettingsLabel() { return Localize(showAdvancedSettings ? "Hide Advanced Settings" : "Show Advanced Settings", showAdvancedSettings ? "詳細設定を隠す" : "詳細設定を表示", showAdvancedSettings ? "隐藏高级设置" : "显示高级设置"); }
-    string RenderedSplatCountLabel(int count) { return Localize("Rendered Splats: ", "描画スプラット数: ", "已渲染 Splat 数：") + count; }
+    string RenderedSplatCountLabel(int count) { return Localize("Rendered Splats: ", "描画スプラット数: ", "渲染 Splat 数（估算）：") + count; }
     bool SliderCanWriteBack(int sliderKind, bool allowWriteBack) { return allowWriteBack; }
     bool ShouldShowLODControls() { return gaussianSplatRenderer != null && gaussianSplatRenderer.HasActiveLODObjects(); }
 
@@ -1644,7 +1644,7 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
         bool isMaster = Networking.LocalPlayer != null && Networking.LocalPlayer.isMaster;
         SetInteractable(galleryMasterLockButton, isMaster); // only the master can toggle the lock
         SetText(galleryMasterNameLabel, _galleryMasterName);
-        SetText(galleryMasterLockTitle, Localize("Master lock:", "マスターロック:", "实例主控锁定："));
+        SetText(galleryMasterLockTitle, Localize("Master lock:", "マスターロック:", "仅房主可切换："));
         SetText(galleryMasterLockLabel, Localize(galleryMasterLock ? "ON" : "OFF", galleryMasterLock ? "オン" : "オフ", galleryMasterLock ? "开启" : "关闭"));
         if (galleryMasterLockButton != null)
         {

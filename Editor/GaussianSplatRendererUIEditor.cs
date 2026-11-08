@@ -30,11 +30,11 @@ namespace GaussianSplatting.Editor
                 GSEditorText.T("Add splat objects here to turn the area into a gallery: in-game only the selected one renders, and " +
                 "the list builds itself. Splat objects not listed here are left untouched.",
                 "Splat オブジェクトを追加するとギャラリーになります。ゲーム内では選択したものだけが描画され、リストは自動生成されます。リスト外のオブジェクトには影響しません。",
-                "在此添加 Splat 对象即可启用画廊：游戏中只渲染选中的对象，列表会自动生成。列表之外的 Splat 对象不受影响。"),
+                "启用画廊并在此添加 Splat 对象后，游戏中只渲染选中的对象，列表会自动生成。列表之外的 Splat 对象不受影响。"),
                 MessageType.None);
             EditorGUILayout.PropertyField(serializedObject.FindProperty("galleryEnabled"), new GUIContent(GSEditorText.T("Gallery Enabled", "ギャラリーを有効化", "启用画廊")));
             EditorGUILayout.HelpBox(GSEditorText.T("Turn this off to temporarily disable gallery UI and selection enforcement without clearing the list or changing listed splat active states.", "無効にするとリストを保持したままギャラリー UI と選択制御を一時停止し、Splat の有効状態は変更されません。", "关闭后会暂时禁用画廊界面和选中状态控制，保留列表且不改变列表中 Splat 的启用状态。"), MessageType.None);
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("galleryMasterLock"), new GUIContent(GSEditorText.T("Master Lock", "マスターロック", "实例主控锁定")));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("galleryMasterLock"), new GUIContent(GSEditorText.T("Master Lock", "マスターロック", "仅房主可切换")));
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField(GSEditorText.T("Additional Description", "追加説明", "附加描述"), EditorStyles.boldLabel);

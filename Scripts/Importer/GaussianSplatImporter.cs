@@ -2680,15 +2680,15 @@ namespace GaussianSplatting.Editor.Importers
                 ? $" 計算 LOD により保存数がソースの {estimatedSourceCount:N0} splat を超えています。無効にすると {estimatedSourceCount:N0} が保存されます。"
                 : string.Empty;
             string outcomeZh = cappedCoeffCount > 0
-                ? $"此 Splat 将改为按 {cappedBand} 导入。"
-                : "当前存储的 Splat 数量下没有符合上限的 SH 阶数，因此只导入 DC 分量。";
+                ? $"此 Splat 预计将改为按 {cappedBand} 导入。"
+                : "按预计存储的 Splat 数量计算，没有符合上限的 SH 阶数，因此预计只导入 DC 分量。";
             string lodNoteZh = entry.lodComputeSplats
-                ? $" 计算 LOD 使存储数量超过源文件的 {estimatedSourceCount:N0} 个 Splat；关闭后将存储 {estimatedSourceCount:N0} 个。"
+                ? $" 预计输入为 {estimatedSourceCount:N0} 个 Splat；存储数量已考虑 LOD 重采样和复用。"
                 : string.Empty;
             EditorGUILayout.HelpBox(GSEditorText.T(
                 $"{GaussianSplatImporter.SHBandForCoeffCount(effectiveCoeffCount)} needs {storedCount:N0} stored splats x {effectiveCoeffCount} coefficients = {shTexels:N0} SH texels, over the import cap of {GaussianSplatImporter.MaxLODImportSHTexels:N0}. {outcomeEn}{lodNoteEn}",
                 $"{GaussianSplatImporter.SHBandForCoeffCount(effectiveCoeffCount)} は 保存 {storedCount:N0} splat x 係数 {effectiveCoeffCount} = SH テクセル {shTexels:N0} を要し、インポート上限 {GaussianSplatImporter.MaxLODImportSHTexels:N0} を超えます。{outcomeJa}{lodNoteJa}",
-                $"{GaussianSplatImporter.SHBandForCoeffCount(effectiveCoeffCount)} 需要 {storedCount:N0} 个存储 Splat × {effectiveCoeffCount} 个系数 = {shTexels:N0} 个 SH 纹素，超过导入上限 {GaussianSplatImporter.MaxLODImportSHTexels:N0}。{outcomeZh}{lodNoteZh}"), MessageType.Warning);
+                $"按预计存储的 {storedCount:N0} 个 Splat 计算，{GaussianSplatImporter.SHBandForCoeffCount(effectiveCoeffCount)} 需要 {storedCount:N0} × {effectiveCoeffCount} = {shTexels:N0} 个 SH 纹素，超过导入上限 {GaussianSplatImporter.MaxLODImportSHTexels:N0}。{outcomeZh}{lodNoteZh}"), MessageType.Warning);
         }
 
         string GetComputedLodSplatEstimateLabel(ImportEntry entry)
@@ -2697,7 +2697,7 @@ namespace GaussianSplatting.Editor.Importers
             if (estimatedSourceCount < 0)
             {
                 return GSEditorText.T("Effective stored splat count will be shown after the preview has loaded.",
-                    "プレビュー読み込み後に有効な保存 Splat 数を表示します。", "预览加载完成后将显示实际存储的 Splat 数量。");
+                    "プレビュー読み込み後に有効な保存 Splat 数を表示します。", "预览加载完成后将显示预计存储的 Splat 数量。");
             }
 
             int resamplePercent = NormalizeLODResamplePercent(entry.lodResamplePercent);
@@ -2710,7 +2710,7 @@ namespace GaussianSplatting.Editor.Importers
             return GSEditorText.T(
                 $"Estimated splats: source {estimatedSourceCount:N0}, LOD0 {resampledLod0Count:N0} ({resamplePercent}%, {lod0Multiplier:0.00}x), computed LOD {lodSplatCount:N0}, stored {storedCount:N0} ({sourceMultiplier:0.00}x source, {reusePercent}% reused)",
                 $"推定 Splat 数: ソース {estimatedSourceCount:N0}、LOD0 {resampledLod0Count:N0} ({resamplePercent}%、{lod0Multiplier:0.00}倍)、計算 LOD {lodSplatCount:N0}、保存 {storedCount:N0} (ソースの {sourceMultiplier:0.00}倍、{reusePercent}% 再利用)",
-                $"预计 Splat 数量：源文件 {estimatedSourceCount:N0}，LOD0 {resampledLod0Count:N0}（{resamplePercent}%，{lod0Multiplier:0.00} 倍），计算 LOD {lodSplatCount:N0}，存储 {storedCount:N0}（源文件的 {sourceMultiplier:0.00} 倍，复用 {reusePercent}%）");
+                $"预计 Splat 数量：输入 {estimatedSourceCount:N0}，LOD0 {resampledLod0Count:N0}（{resamplePercent}%，{lod0Multiplier:0.00} 倍），新增 LOD {lodSplatCount:N0}，存储 {storedCount:N0}（输入的 {sourceMultiplier:0.00} 倍，LOD 复用率 {reusePercent}%）");
         }
 
         static int EstimateStoredLodSplatCount(int splatCount, int chunkSize, bool computeLodSplats)
@@ -3165,7 +3165,7 @@ namespace GaussianSplatting.Editor.Importers
                 if (entry.lodComputeSplats)
                 {
                     entry.lodResamplePercent = EditorGUILayout.IntSlider(GSEditorText.T("LOD Resampling Rate", "LOD リサンプリング率", "LOD 重采样比例"), NormalizeLODResamplePercent(entry.lodResamplePercent), 1, DefaultLODResamplePercent);
-                    entry.lodReusePercent = EditorGUILayout.IntSlider(GSEditorText.T("LOD Reused Splats", "LOD 再利用 Splat", "LOD 复用 Splat"), NormalizeLODReusePercent(entry.lodReusePercent), 1, 99);
+                    entry.lodReusePercent = EditorGUILayout.IntSlider(GSEditorText.T("LOD Reused Splats", "LOD 再利用 Splat", "LOD Splat 复用比例"), NormalizeLODReusePercent(entry.lodReusePercent), 1, 99);
                     EditorGUILayout.LabelField(GetComputedLodSplatEstimateLabel(entry), EditorStyles.wordWrappedMiniLabel);
                 }
             }
@@ -3191,7 +3191,7 @@ namespace GaussianSplatting.Editor.Importers
                 entry.shCompression = (GaussianSplatImporter.SHCompression)EditorGUILayout.IntPopup(GSEditorText.C("SH Compression", "SH 圧縮", "SH 压缩"), (int)entry.shCompression, ShFormatLabels, ShFormatValues);
                 EditorGUILayout.HelpBox(GSEditorText.T(
                     "SH texture format: RGBA32 = 32bpp, RGB565 = 16bpp, BC7 = 8bpp, BC1 = 4bpp. RGB565 and BC compression are lossy. LOD scene fusion uses BC7 regardless of this setting. (LOD only: the import steps down to the highest band that fits its SH cap, and the scene's fused SH must fit one texture; objects past that fall back to DC.)",
-                    "SH テクスチャ形式: RGBA32 = 32bpp、RGB565 = 16bpp、BC7 = 8bpp、BC1 = 4bpp。RGB565 と BC 圧縮は不可逆です。LOD のシーン統合では、この設定にかかわらず BC7 を使用します。(LOD のみ: インポートは SH 上限に収まる最大バンドまで自動的に下げられ、さらにシーン全体の統合 SH は 1 テクスチャに収まる必要があります。超過するオブジェクトは DC にフォールバックします。)", "SH 纹理格式：RGBA32 = 32bpp、RGB565 = 16bpp、BC7 = 8bpp、BC1 = 4bpp。RGB565 和 BC 压缩均为有损压缩。LOD 场景融合始终使用 BC7。（仅 LOD：导入时会降低至符合 SH 上限的最高阶数；场景融合后的 SH 必须放入一张纹理，超出上限的对象将回退到 DC。）"), MessageType.Info);
+                    "SH テクスチャ形式: RGBA32 = 32bpp、RGB565 = 16bpp、BC7 = 8bpp、BC1 = 4bpp。RGB565 と BC 圧縮は不可逆です。LOD のシーン統合では、この設定にかかわらず BC7 を使用します。(LOD のみ: インポートは SH 上限に収まる最大バンドまで自動的に下げられ、さらにシーン全体の統合 SH は 1 テクスチャに収まる必要があります。超過するオブジェクトは DC にフォールバックします。)", "SH 纹理格式：RGBA32 = 32bpp、RGB565 = 16bpp、BC7 = 8bpp、BC1 = 4bpp。RGB565 和 BC 压缩均为有损压缩。LOD 场景融合始终使用 BC7。（仅 LOD：导入时会降低至符合 SH 上限的最高阶数。场景融合有单独的 SH 上限；启用分页融合 SH 可提高上限，超出上限的对象将回退到 DC。）"), MessageType.Info);
             }
             else
             {

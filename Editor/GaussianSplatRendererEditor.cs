@@ -132,7 +132,7 @@ namespace GaussianSplatting.Editor
             EditorGUILayout.PropertyField(_debugDrawChunkCenterArea, GSEditorText.C("Debug Chunk Center+Area", "チャンク重心+面積をデバッグ表示", "调试分块中心和面积"));
             if (!serializedObject.isEditingMultipleObjects && target is GaussianSplatRenderer sceneRenderer)
             {
-                EditorGUILayout.LabelField(GSEditorText.T("Rendered Splat Count", "描画スプラット数", "已渲染 Splat 数量"), sceneRenderer.GetCurrentRenderedSplatCount().ToString());
+                EditorGUILayout.LabelField(GSEditorText.T("Rendered Splat Count", "描画スプラット数", "渲染 Splat 数量（估算）"), sceneRenderer.GetCurrentRenderedSplatCount().ToString());
                 EditorGUILayout.LabelField(GSEditorText.T("Baked Splat Count", "ベイク済みスプラット数", "已烘焙 Splat 数量"), sceneRenderer.GetTotalBakedSplatCount().ToString("N0"));
                 long splatDataBytes = sceneRenderer.GetBakedSplatDataBytes();
                 if (splatDataBytes > 0)

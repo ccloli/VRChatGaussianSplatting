@@ -84,7 +84,7 @@ namespace GaussianSplatting.Editor
         void DrawEditableMetadata()
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.LabelField(GSEditorText.T("Display Metadata", "表示メタデータ", "显示元数据"), EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(GSEditorText.T("Display Metadata", "表示メタデータ", "展示信息"), EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(_splatName, GSEditorText.C("Display Name", "表示名", "显示名称"));
             EditorGUILayout.PropertyField(_description, GSEditorText.C("Description", "説明", "描述"));
             EditorGUILayout.EndVertical();
@@ -115,7 +115,7 @@ namespace GaussianSplatting.Editor
             DrawInfoRow(GSEditorText.T("Position Encoding", "位置エンコード", "位置编码"), lo.usePackedPositions ? "Packed RGBA32" : "RGBAFloat");
             DrawInfoRow(GSEditorText.T("Max SH Band", "最大 SH バンド", "最大 SH 阶数"), "SH" + lo.GetMaxSHBand());
             DrawInfoRow(GSEditorText.T("SH Coefficients", "SH 係数", "SH 系数"), ShCoeffSummary(lo));
-            DrawInfoRow(GSEditorText.T("LOD Reused Splats", "LOD 再利用 Splat", "LOD 复用 Splat"), lo.GetLodReusePercent() + "%");
+            DrawInfoRow(GSEditorText.T("LOD Reused Splats", "LOD 再利用 Splat", "LOD Splat 复用比例"), lo.GetLodReusePercent() + "%");
             DrawInfoRow(GSEditorText.T("Bounds Center", "境界中心", "边界中心"), FormatVector((lo.boundsMin + lo.boundsMax) * 0.5f));
             DrawInfoRow(GSEditorText.T("Bounds Size", "境界サイズ", "边界大小"), FormatVector(lo.boundsMax - lo.boundsMin));
             DrawInfoRow(GSEditorText.T("Bounds Min", "境界 Min", "边界最小值"), FormatVector(lo.boundsMin));
