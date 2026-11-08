@@ -20,6 +20,7 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
     const int LanguageEnglish = 0;
     const int LanguageJapanese = 1;
     const int LanguageChineseSimplified = 2;
+    public const string ChineseFontTextSuffix = " [Simplified Chinese]";
     const float MinAlphaCutoff = 0.005f;
     const float MinPositiveLodSplatCap = 10000.0f;
     const float NoCapSliderGap = 0.01f;
@@ -65,6 +66,12 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
     public TextMeshProUGUI alphaCullLabelText, alphaCullText;
     public TextMeshProUGUI lodCullLabelText, lodCullText, qualitySectionText;
     public TextMeshProUGUI languageSectionText;
+    // The editor builds a second text object for each label because Udon cannot assign TMP font assets.
+    [HideInInspector] public TextMeshProUGUI[] sourceFontTexts;
+    [HideInInspector] public TextMeshProUGUI[] chineseFontTexts;
+    [HideInInspector] public LayoutElement[] sourceFontLayouts;
+    [HideInInspector] public bool[] sourceFontEnabled;
+    [HideInInspector] public bool[] sourceFontIgnoresLayout;
     public Button vrcLightVolumesButton, englishLanguageButton, japaneseLanguageButton, chineseLanguageButton;
     public Button qualityVeryLowButton, qualityLowButton, qualityMediumButton, qualityHighButton, advancedSettingsButton;
     public Slider shBandSlider, antiAliasingSlider, lightVolumeIntensitySlider, alphaCutoffSlider;
@@ -148,6 +155,7 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
     Color _galleryDescriptionColor = new Color(0.78f, 0.81f, 0.86f, 1.0f);
 
     bool _sliderValuesInitialized;
+    int _appliedFontLanguage = -1;
     bool _layoutDefaultsInitialized;
     float _lastShBandSliderValue;
     float _lastAntiAliasingSliderValue;
@@ -847,26 +855,81 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
     bool SliderCanWriteBack(int sliderKind, bool allowWriteBack) { return allowWriteBack; }
     bool ShouldShowLODControls() { return gaussianSplatRenderer != null && gaussianSplatRenderer.HasActiveLODObjects(); }
 
-    // TMP_Text.font is not exposed to Udon. The Chinese font tag selects the SC asset;
-    // without it the panel keeps its Japanese base font and its fallback chain.
     void SetText(TextMeshProUGUI text, string value)
     {
         if (text == null) return;
         if (value == null) value = "";
-        if (selectedLanguage != LanguageChineseSimplified || value.Length == 0)
+        if (text.text == value) return;
+        text.text = value;
+        if (selectedLanguage == LanguageChineseSimplified)
         {
-            if (text.text != value) text.text = value;
-            return;
+            TextMeshProUGUI chinese = FindChineseFontText(text);
+            if (chinese != null && chinese.text != value) chinese.text = value;
         }
-        const string prefix = "<font=\"NotoSansSC-VF SDF\">";
-        const string suffix = "</font>";
-        string current = text.text;
-        if (current != null && current.Length == prefix.Length + value.Length + suffix.Length &&
-            current.StartsWith(prefix) && current.EndsWith(suffix) && current.IndexOf(value, prefix.Length) == prefix.Length) return;
-        text.text = prefix + value + suffix;
     }
     void SetLocalizedText(TextMeshProUGUI text, string english, string japanese, string chinese) { SetText(text, Localize(english, japanese, chinese)); }
-    void SetActive(Component component, bool active) { if (component != null && component.gameObject.activeSelf != active) component.gameObject.SetActive(active); }
+
+    TextMeshProUGUI FindChineseFontText(Component source)
+    {
+        if (source == null || source.transform.parent == null) return null;
+        Transform parent = source.transform.parent;
+        int index = source.transform.GetSiblingIndex() + 1;
+        if (index >= parent.childCount) return null;
+        Transform sibling = parent.GetChild(index);
+        if (sibling.name != source.name + ChineseFontTextSuffix) return null;
+        return sibling.GetComponent<TextMeshProUGUI>();
+    }
+
+    void SyncLanguageFonts()
+    {
+        if (_appliedFontLanguage == selectedLanguage) return;
+        if (sourceFontTexts == null || chineseFontTexts == null || sourceFontLayouts == null ||
+            sourceFontEnabled == null || sourceFontIgnoresLayout == null) return;
+        int count = sourceFontTexts.Length;
+        if (chineseFontTexts.Length != count || sourceFontLayouts.Length != count ||
+            sourceFontEnabled.Length != count || sourceFontIgnoresLayout.Length != count) return;
+
+        bool useChinese = selectedLanguage == LanguageChineseSimplified;
+        for (int i = 0; i < count; i++)
+        {
+            TextMeshProUGUI source = sourceFontTexts[i];
+            TextMeshProUGUI chinese = chineseFontTexts[i];
+            LayoutElement layout = sourceFontLayouts[i];
+            if (source == null || chinese == null || layout == null) continue;
+
+            bool sourceEnabled = sourceFontEnabled[i] && !useChinese;
+            if (((Behaviour)source).enabled != sourceEnabled) ((Behaviour)source).enabled = sourceEnabled;
+            bool ignoreLayout = (useChinese && sourceFontEnabled[i]) || sourceFontIgnoresLayout[i];
+            if (layout.ignoreLayout != ignoreLayout) layout.ignoreLayout = ignoreLayout;
+
+            bool chineseActive = useChinese && sourceFontEnabled[i] && source.gameObject.activeSelf;
+            if (chinese.gameObject.activeSelf != chineseActive) chinese.gameObject.SetActive(chineseActive);
+            if (chineseActive && chinese.text != source.text) chinese.text = source.text;
+        }
+        _appliedFontLanguage = selectedLanguage;
+    }
+
+#if UNITY_EDITOR && !COMPILER_UDONSHARP
+    public void InvalidateFontSynchronization() { _appliedFontLanguage = -1; }
+#endif
+
+    void SetActive(Component component, bool active)
+    {
+        if (component == null || component.gameObject.activeSelf == active) return;
+        component.gameObject.SetActive(active);
+        if (selectedLanguage != LanguageChineseSimplified) return;
+        TextMeshProUGUI chinese = FindChineseFontText(component);
+        if (chinese == null || sourceFontTexts == null || sourceFontEnabled == null) return;
+        for (int i = 0; i < sourceFontTexts.Length && i < sourceFontEnabled.Length; i++)
+        {
+            if (sourceFontTexts[i] == component)
+            {
+                bool chineseActive = active && sourceFontEnabled[i];
+                if (chinese.gameObject.activeSelf != chineseActive) chinese.gameObject.SetActive(chineseActive);
+                return;
+            }
+        }
+    }
     void SetParentActive(Component component, bool active)
     {
         Transform parent = component != null ? component.transform.parent : null;
@@ -1021,7 +1084,7 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
         SetLocalizedText(lodCullLabelText, "LOD Splat Cap", "LOD スプラット上限", "LOD Splat 数量上限");
         SetLocalizedText(qualitySectionText, "Quality", "品質", "画质");
         SetLocalizedText(languageSectionText, "Language", "言語", "语言");
-        SetLocalizedText(ResolveGalleryHeaderText(), "Gallery (global)", "ギャラリー (全体)", "画廊（全局）");
+        SetLocalizedText(ResolveGalleryHeaderText(), "Gallery (global)", "ギャラリー (全体)", "画廊（Global）");
         SetLocalizedText(socialTitleText, "Scan or copy the link", "リンクをスキャンまたはコピー", "扫描或复制链接");
         if (socialCloseButton != null) ApplyButtonVisual(socialCloseButton, Localize("Close", "閉じる", "关闭"), _toggleDisabledColor);
         RefreshLanguageButtons();
@@ -1430,6 +1493,7 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
             SetText(alphaCullText, FormatFloat(DefaultAlphaCull));
             SetSliderWithoutNotify(lodCullSlider, GetSliderDisplayValue(SliderLODSplatCap, DefaultLODSplatCap));
             SetText(lodCullText, DefaultLODSplatCap.ToString());
+            SyncLanguageFonts();
             return;
         }
         SetText(currentSplatText, RenderedSplatCountLabel(gaussianSplatRenderer.GetCurrentRenderedSplatCount()));
@@ -1438,6 +1502,7 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
         SetText(alphaCullText, FormatFloat(gaussianSplatRenderer.alphaCull));
         SetText(lodCullText, SliderValueText(SliderLODSplatCap, gaussianSplatRenderer.GetEffectiveCombinedLodSplatBudget()));
         RefreshMaterialControls();
+        SyncLanguageFonts();
         _sliderValuesInitialized = true;
     }
 

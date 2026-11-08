@@ -24,6 +24,7 @@ namespace GaussianSplatting.Editor
         const string UiFontAssetPath = "Assets/VRChatGaussianSplatting/Resources/Fonts/NotoSansJP-VF.ttf";
         const string UiTextMeshProFontAssetPath = "Assets/VRChatGaussianSplatting/Resources/Fonts/NotoSansJP-VF TMP.asset";
         const string ChineseTextMeshProFontAssetGuid = "f76ee1974fbcc624098cb6a8a964d2dc";
+        const string ChineseTextSuffix = GaussianSplatRendererUI.ChineseFontTextSuffix;
         const string UiMaterialFolderPath = "Assets/VRChatGaussianSplatting/Resources/Materials";
         const string SupersampledUiMaterialAssetPath = UiMaterialFolderPath + "/GaussianSplatUISupersampled.mat";
         const string VrChatSupersampledUiShaderName = "VRChat/Mobile/Worlds/Supersampled UI";
@@ -361,8 +362,10 @@ namespace GaussianSplatting.Editor
             // Rebuild the gallery section (Body Row child) from the restored list.
             InvokeSyncEditorSerializedState(generatedUi);
 
+            EnsureChineseFontTexts(generatedUi);
             EnsureAuthorTextCharacters(generatedUi);
             generatedUi.RefreshUI();
+            UdonSharpEditorUtility.CopyProxyToUdon(generatedUi);
             EditorUtility.SetDirty(canvasObject);
             EditorUtility.SetDirty(renderer);
             EditorUtility.SetDirty(generatedUi);
@@ -542,6 +545,7 @@ namespace GaussianSplatting.Editor
                     }
                 }
             }
+            changed |= EnsureChineseFontTexts(ui);
             EnsureAuthorTextCharacters(ui);
             if (changed)
             {
@@ -550,6 +554,178 @@ namespace GaussianSplatting.Editor
                 UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(ui.gameObject.scene);
                 ui.RefreshUI();
             }
+        }
+
+        // Keep the original text objects and their references. A sibling with the Chinese font takes
+        // their place in the layout when Chinese is selected, without resolving a font tag by name.
+        static bool EnsureChineseFontTexts(GaussianSplatRendererUI ui)
+        {
+            TMP_FontAsset chineseFont = GetChineseFont();
+            if (ui == null || chineseFont == null) return false;
+
+            TextMeshProUGUI[] oldSources = ui.sourceFontTexts ?? Array.Empty<TextMeshProUGUI>();
+            TextMeshProUGUI[] oldChinese = ui.chineseFontTexts ?? Array.Empty<TextMeshProUGUI>();
+            LayoutElement[] oldLayouts = ui.sourceFontLayouts ?? Array.Empty<LayoutElement>();
+            bool[] oldEnabled = ui.sourceFontEnabled ?? Array.Empty<bool>();
+            bool[] oldIgnore = ui.sourceFontIgnoresLayout ?? Array.Empty<bool>();
+            Dictionary<TextMeshProUGUI, int> oldIndices = new Dictionary<TextMeshProUGUI, int>();
+            HashSet<TextMeshProUGUI> existingChinese = new HashSet<TextMeshProUGUI>();
+            bool changed = false;
+            for (int i = 0; i < oldSources.Length; i++)
+            {
+                TextMeshProUGUI source = oldSources[i];
+                TextMeshProUGUI chinese = i < oldChinese.Length ? oldChinese[i] : null;
+                if (source != null && source.transform.IsChildOf(ui.transform))
+                {
+                    oldIndices[source] = i;
+                    if (chinese != null) existingChinese.Add(chinese);
+                }
+                else if (chinese != null)
+                {
+                    Undo.DestroyObjectImmediate(chinese.gameObject);
+                    changed = true;
+                }
+            }
+
+            List<TextMeshProUGUI> sources = new List<TextMeshProUGUI>();
+            List<TextMeshProUGUI> chineseTexts = new List<TextMeshProUGUI>();
+            List<LayoutElement> layouts = new List<LayoutElement>();
+            List<bool> enabled = new List<bool>();
+            List<bool> ignoresLayout = new List<bool>();
+            foreach (TextMeshProUGUI source in ui.GetComponentsInChildren<TextMeshProUGUI>(true))
+            {
+                if (source == null || existingChinese.Contains(source) || source.name.EndsWith(ChineseTextSuffix, StringComparison.Ordinal) ||
+                    source.GetComponentInParent<TMP_InputField>(true) != null || source.transform.parent == null) continue;
+
+                bool hadSource = oldIndices.TryGetValue(source, out int oldIndex);
+                LayoutElement layout = source.GetComponent<LayoutElement>();
+                if (layout == null)
+                {
+                    layout = Undo.AddComponent<LayoutElement>(source.gameObject);
+                    changed = true;
+                }
+                bool wasEnabled = hadSource && oldIndex < oldEnabled.Length ? oldEnabled[oldIndex] : source.enabled;
+                bool ignoredLayout = hadSource && oldIndex < oldIgnore.Length ? oldIgnore[oldIndex] : layout.ignoreLayout;
+                TextMeshProUGUI chinese = hadSource && oldIndex < oldChinese.Length ? oldChinese[oldIndex] : null;
+                if (chinese == null)
+                {
+                    GameObject go = new GameObject(source.name + ChineseTextSuffix, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI), typeof(LayoutElement));
+                    Undo.RegisterCreatedObjectUndo(go, "Create Chinese UI text");
+                    go.transform.SetParent(source.transform.parent, false);
+                    chinese = go.GetComponent<TextMeshProUGUI>();
+                    EditorUtility.CopySerialized(source, chinese);
+                    EditorUtility.CopySerialized(layout, go.GetComponent<LayoutElement>());
+                    CopyTextRect(source.rectTransform, chinese.rectTransform);
+                    go.SetActive(false);
+                    changed = true;
+                }
+                if (chinese.transform.parent != source.transform.parent)
+                {
+                    Undo.SetTransformParent(chinese.transform, source.transform.parent, "Move Chinese UI text");
+                    CopyTextRect(source.rectTransform, chinese.rectTransform);
+                    changed = true;
+                }
+                if (chinese.transform.GetSiblingIndex() != source.transform.GetSiblingIndex() + 1)
+                {
+                    chinese.transform.SetSiblingIndex(source.transform.GetSiblingIndex() + 1);
+                    changed = true;
+                }
+                if (chinese.name != source.name + ChineseTextSuffix)
+                {
+                    chinese.name = source.name + ChineseTextSuffix;
+                    changed = true;
+                }
+                if (chinese.font != chineseFont) { chinese.font = chineseFont; EditorUtility.SetDirty(chinese); changed = true; }
+                LayoutElement chineseLayout = chinese.GetComponent<LayoutElement>();
+                if (chineseLayout == null)
+                {
+                    chineseLayout = Undo.AddComponent<LayoutElement>(chinese.gameObject);
+                    changed = true;
+                }
+                changed |= SyncChineseTextStyle(source, chinese, layout, chineseLayout, ignoredLayout);
+
+                sources.Add(source);
+                chineseTexts.Add(chinese);
+                layouts.Add(layout);
+                enabled.Add(wasEnabled);
+                ignoresLayout.Add(ignoredLayout);
+            }
+
+            HashSet<TextMeshProUGUI> retainedChinese = new HashSet<TextMeshProUGUI>(chineseTexts);
+            foreach (TextMeshProUGUI chinese in existingChinese)
+            {
+                if (chinese != null && !retainedChinese.Contains(chinese))
+                {
+                    Undo.DestroyObjectImmediate(chinese.gameObject);
+                    changed = true;
+                }
+            }
+
+            if (!SameItems(oldSources, sources) || !SameItems(oldChinese, chineseTexts) || !SameItems(oldLayouts, layouts) ||
+                !SameItems(oldEnabled, enabled) || !SameItems(oldIgnore, ignoresLayout))
+            {
+                ui.sourceFontTexts = sources.ToArray();
+                ui.chineseFontTexts = chineseTexts.ToArray();
+                ui.sourceFontLayouts = layouts.ToArray();
+                ui.sourceFontEnabled = enabled.ToArray();
+                ui.sourceFontIgnoresLayout = ignoresLayout.ToArray();
+                changed = true;
+            }
+            if (changed) ui.InvalidateFontSynchronization();
+            return changed;
+        }
+
+        static bool SameItems<T>(T[] existing, List<T> values)
+        {
+            if (existing.Length != values.Count) return false;
+            for (int i = 0; i < existing.Length; i++)
+            {
+                if (!EqualityComparer<T>.Default.Equals(existing[i], values[i])) return false;
+            }
+            return true;
+        }
+
+        static void CopyTextRect(RectTransform source, RectTransform target)
+        {
+            target.anchorMin = source.anchorMin;
+            target.anchorMax = source.anchorMax;
+            target.pivot = source.pivot;
+            target.sizeDelta = source.sizeDelta;
+            target.anchoredPosition3D = source.anchoredPosition3D;
+            target.localRotation = source.localRotation;
+            target.localScale = source.localScale;
+        }
+
+        static bool SyncChineseTextStyle(TextMeshProUGUI source, TextMeshProUGUI chinese, LayoutElement sourceLayout, LayoutElement layout, bool ignoresLayout)
+        {
+            bool changed = false;
+            if (chinese.color != source.color) { chinese.color = source.color; changed = true; }
+            if (chinese.fontSize != source.fontSize) { chinese.fontSize = source.fontSize; changed = true; }
+            if (chinese.enableAutoSizing != source.enableAutoSizing) { chinese.enableAutoSizing = source.enableAutoSizing; changed = true; }
+            if (chinese.fontSizeMin != source.fontSizeMin) { chinese.fontSizeMin = source.fontSizeMin; changed = true; }
+            if (chinese.fontSizeMax != source.fontSizeMax) { chinese.fontSizeMax = source.fontSizeMax; changed = true; }
+            if (chinese.fontStyle != source.fontStyle) { chinese.fontStyle = source.fontStyle; changed = true; }
+            if (chinese.fontWeight != source.fontWeight) { chinese.fontWeight = source.fontWeight; changed = true; }
+            if (chinese.alignment != source.alignment) { chinese.alignment = source.alignment; changed = true; }
+            if (chinese.characterSpacing != source.characterSpacing) { chinese.characterSpacing = source.characterSpacing; changed = true; }
+            if (chinese.wordSpacing != source.wordSpacing) { chinese.wordSpacing = source.wordSpacing; changed = true; }
+            if (chinese.lineSpacing != source.lineSpacing) { chinese.lineSpacing = source.lineSpacing; changed = true; }
+            if (chinese.paragraphSpacing != source.paragraphSpacing) { chinese.paragraphSpacing = source.paragraphSpacing; changed = true; }
+            if (chinese.richText != source.richText) { chinese.richText = source.richText; changed = true; }
+            if (chinese.raycastTarget != source.raycastTarget) { chinese.raycastTarget = source.raycastTarget; changed = true; }
+            if (chinese.enableWordWrapping != source.enableWordWrapping) { chinese.enableWordWrapping = source.enableWordWrapping; changed = true; }
+            if (chinese.overflowMode != source.overflowMode) { chinese.overflowMode = source.overflowMode; changed = true; }
+            if (chinese.margin != source.margin) { chinese.margin = source.margin; changed = true; }
+            if (layout.ignoreLayout != ignoresLayout) { layout.ignoreLayout = ignoresLayout; changed = true; }
+            if (layout.minWidth != sourceLayout.minWidth) { layout.minWidth = sourceLayout.minWidth; changed = true; }
+            if (layout.preferredWidth != sourceLayout.preferredWidth) { layout.preferredWidth = sourceLayout.preferredWidth; changed = true; }
+            if (layout.flexibleWidth != sourceLayout.flexibleWidth) { layout.flexibleWidth = sourceLayout.flexibleWidth; changed = true; }
+            if (layout.minHeight != sourceLayout.minHeight) { layout.minHeight = sourceLayout.minHeight; changed = true; }
+            if (layout.preferredHeight != sourceLayout.preferredHeight) { layout.preferredHeight = sourceLayout.preferredHeight; changed = true; }
+            if (layout.flexibleHeight != sourceLayout.flexibleHeight) { layout.flexibleHeight = sourceLayout.flexibleHeight; changed = true; }
+            if (layout.layoutPriority != sourceLayout.layoutPriority) { layout.layoutPriority = sourceLayout.layoutPriority; changed = true; }
+            if (changed) { EditorUtility.SetDirty(chinese); EditorUtility.SetDirty(layout); }
+            return changed;
         }
 
         internal static void EnsureAuthorTextCharacters(GaussianSplatRendererUI ui)
