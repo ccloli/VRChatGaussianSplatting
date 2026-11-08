@@ -112,7 +112,7 @@ The renderer creates a world-space control canvas automatically when splats are 
 - Alpha Cutoff (lower = better quality, higher cost) + Alpha Cull
 - Antialiasing
 - Camera Quantization
-- Language (English / 日本語 / 简体中文)
+- Language (English / 日本語 / 简体中文): follows the VRChat display language on entry and subsequent language changes until manually selected. Unsupported languages use English.
 - Panel additional descriptions can be entered separately for each language in the UI component inspector. Existing generated panels are upgraded in place. Both TMP fonts use dynamic, multi-atlas population; panel text and gallery names/descriptions are also added to the font assets in the editor. Characters first encountered in a running world are added to its in-memory atlas when the source font contains them. The panel uses directly referenced Japanese and Chinese text objects so the selected language does not depend on resolving font tags in the VRChat client.
 - An **Advanced Settings** toggle reveals the finer sliders
 - LOD Splat Cap (shown only when LOD splats are present)
@@ -341,7 +341,7 @@ VRChat ワールド（Udon）でスプラットをランタイムにカメラソ
 - アルファカットオフ（低いほど高品質・高コスト）＋アルファカル
 - アンチエイリアス
 - カメラ量子化
-- 言語（英語 / 日本語 / 簡体字中国語）
+- 言語（英語 / 日本語 / 簡体字中国語）：入室時と VRChat の表示言語変更時に自動選択され、手動選択後はその設定を維持する。未対応言語では英語を使用。
 - UI コンポーネントのインスペクターで各言語の追加説明を入力可能。既存の自動生成パネルもそのまま更新される。両方の TMP フォントは動的・マルチアトラスで、パネルやギャラリーのテキストもエディタでフォントに追加される。実行中に初めて現れた文字は、元のフォントに存在すればメモリ上のアトラスに追加される。パネルはフォントを直接参照する日本語用と中国語用のテキストを切り替えるため、VRChat クライアントでのフォントタグの読み込みに依存しない。
 - **詳細設定** トグルで細かいスライダーを表示
 - LOD Splat Cap（LOD スプラットが存在するときのみ表示）

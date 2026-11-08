@@ -156,6 +156,8 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
 
     bool _sliderValuesInitialized;
     int _appliedFontLanguage = -1;
+    bool _languageInitialized;
+    bool _languageManuallySelected;
     bool _layoutDefaultsInitialized;
     float _lastShBandSliderValue;
     float _lastAntiAliasingSliderValue;
@@ -172,9 +174,49 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
     void Start()
     {
         if (SkipRuntimeRefresh()) return;
+        if (!_languageInitialized && !_languageManuallySelected)
+        {
+            ApplyDetectedLanguage(GetClientLanguage());
+        }
         UpdateGalleryMasterName();
         ApplyGalleryVisibility();
         RefreshUI();
+    }
+
+    string GetClientLanguage()
+    {
+#if UNITY_EDITOR && !COMPILER_UDONSHARP
+        // The SDK delegate is unavailable in Play Mode when ClientSim is disabled.
+        try { return VRCPlayerApi.GetCurrentLanguage(); }
+        catch (System.NullReferenceException) { return null; }
+#else
+        return VRCPlayerApi.GetCurrentLanguage();
+#endif
+    }
+
+    int LanguageFromLocale(string locale)
+    {
+        if (string.IsNullOrEmpty(locale)) return LanguageEnglish;
+        string code = locale.Trim().ToLowerInvariant();
+        if (code == "ja" || code.StartsWith("ja-")) return LanguageJapanese;
+        if (code == "zh" || code == "zh-cn" || code.StartsWith("zh-cn-") ||
+            code == "zh-sg" || code.StartsWith("zh-sg-") ||
+            code == "zh-my" || code.StartsWith("zh-my-") ||
+            code == "zh-hans" || code.StartsWith("zh-hans-")) return LanguageChineseSimplified;
+        return LanguageEnglish;
+    }
+
+    bool ApplyDetectedLanguage(string locale)
+    {
+        if (_languageManuallySelected || string.IsNullOrEmpty(locale)) return false;
+        selectedLanguage = LanguageFromLocale(locale);
+        _languageInitialized = true;
+        return true;
+    }
+
+    public override void OnLanguageChanged(string language)
+    {
+        if (ApplyDetectedLanguage(language)) RefreshUI();
     }
 
     // The instance master can migrate when players join/leave, so refresh the cached name on those events
@@ -1742,7 +1784,12 @@ public class GaussianSplatRendererUI : UdonSharpBehaviour
     public void IncreaseGaussianScale() { StepGaussianScale(gaussianScaleStep); }
     public void DecreaseGaussianScale() { StepGaussianScale(-gaussianScaleStep); }
 
-    void SetLanguage(int language) { selectedLanguage = Mathf.Clamp(language, LanguageEnglish, LanguageChineseSimplified); RefreshUI(); }
+    void SetManualLanguage(int language)
+    {
+        _languageManuallySelected = true;
+        selectedLanguage = Mathf.Clamp(language, LanguageEnglish, LanguageChineseSimplified);
+    }
+    void SetLanguage(int language) { SetManualLanguage(language); RefreshUI(); }
     public void SetLanguageEnglish() { SetLanguage(LanguageEnglish); }
     public void SetLanguageJapanese() { SetLanguage(LanguageJapanese); }
     public void SetLanguageChineseSimplified() { SetLanguage(LanguageChineseSimplified); }

@@ -20,6 +20,70 @@ namespace GaussianSplatting.Tests
             Assert.AreEqual(expected, GSEditorText.Select(language, "English", "日本語", "简体中文"));
         }
 
+        [TestCase(null, 0)]
+        [TestCase("", 0)]
+        [TestCase("en", 0)]
+        [TestCase("es", 0)]
+        [TestCase("ja", 1)]
+        [TestCase("ja-JP", 1)]
+        [TestCase("JA-jp", 1)]
+        [TestCase("zh", 2)]
+        [TestCase("zh-CN", 2)]
+        [TestCase(" ZH-cn ", 2)]
+        [TestCase("zh-CN-u-nu-hanidec", 2)]
+        [TestCase("zh-Hans", 2)]
+        [TestCase("zh-Hans-CN", 2)]
+        [TestCase("zh-SG", 2)]
+        [TestCase("zh-MY", 2)]
+        [TestCase("zh-TW", 0)]
+        [TestCase("zh-HK", 0)]
+        [TestCase("zh-Hant", 0)]
+        [TestCase("zh-Hant-CN", 0)]
+        public void RuntimeLanguageMatchesVrChatLocale(string locale, int expected)
+        {
+            GameObject root = new GameObject("Language selection test");
+            try
+            {
+                GaussianSplatRendererUI ui = root.AddComponent<GaussianSplatRendererUI>();
+                MethodInfo resolve = typeof(GaussianSplatRendererUI).GetMethod("LanguageFromLocale", BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.NotNull(resolve);
+                Assert.AreEqual(expected, resolve.Invoke(ui, new object[] { locale }));
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void AutomaticLanguageUpdatesDoNotOverrideManualSelection()
+        {
+            GameObject root = new GameObject("Manual language test");
+            try
+            {
+                GaussianSplatRendererUI ui = root.AddComponent<GaussianSplatRendererUI>();
+                System.Type type = typeof(GaussianSplatRendererUI);
+                MethodInfo automatic = type.GetMethod("ApplyDetectedLanguage", BindingFlags.Instance | BindingFlags.NonPublic);
+                MethodInfo manual = type.GetMethod("SetManualLanguage", BindingFlags.Instance | BindingFlags.NonPublic);
+                FieldInfo selected = type.GetField("selectedLanguage", BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.NotNull(automatic);
+                Assert.NotNull(manual);
+                Assert.NotNull(selected);
+                Assert.IsFalse((bool)automatic.Invoke(ui, new object[] { null }));
+                Assert.IsTrue((bool)automatic.Invoke(ui, new object[] { "zh-CN" }));
+                Assert.AreEqual(2, selected.GetValue(ui));
+                Assert.IsTrue((bool)automatic.Invoke(ui, new object[] { "ja" }));
+                Assert.AreEqual(1, selected.GetValue(ui));
+                manual.Invoke(ui, new object[] { 0 });
+                Assert.IsFalse((bool)automatic.Invoke(ui, new object[] { "zh-CN" }));
+                Assert.AreEqual(0, selected.GetValue(ui));
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
         [Test]
         public void FontsReferenceEachOtherAsFirstFallback()
         {
