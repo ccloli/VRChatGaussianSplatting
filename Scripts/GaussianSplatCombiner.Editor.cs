@@ -1202,6 +1202,10 @@ public partial class GaussianSplatCombiner
         int sourceSig = 17;
         var sourceSigSeen = new HashSet<Texture2D>();
 
+        // Compact pages change slice boundaries; skip both earlier square-page layout versions while
+        // preserving the single-texture and unchanged source-texture signatures.
+        if (usePagedSH) sig += 2;
+
         var valid = new List<GaussianSplatObject>();
         GaussianSplatObject[] all = UnityEngine.Object.FindObjectsOfType<GaussianSplatObject>(true);
         for (int i = 0; i < all.Length; i++)

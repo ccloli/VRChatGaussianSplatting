@@ -90,7 +90,8 @@ namespace GaussianSplatting
         }
 
         // A single small page is sized to the data, avoiding a 64 MiB allocation for every small scene.
-        // Multiple pages use full, equal dimensions as required by Texture2DArray.
+        // Array slices must have equal dimensions; size their shared height to the total data instead of
+        // allocating a full 8K square for a mostly empty last slice.
         internal static ShPageLayout ChooseShPageLayout(int texelCount, int maxDimension = FusedShPageDimension)
         {
             if (maxDimension < 4 || (maxDimension & (maxDimension - 1)) != 0)
@@ -98,7 +99,12 @@ namespace GaussianSplatting
             int count = Mathf.Max(1, texelCount);
             long pageCapacity = (long)maxDimension * maxDimension;
             if (count > pageCapacity)
-                return new ShPageLayout(maxDimension, maxDimension, (int)(((long)count + pageCapacity - 1) / pageCapacity));
+            {
+                int pages = (int)(((long)count + pageCapacity - 1) / pageCapacity);
+                long rowCapacity = (long)maxDimension * pages;
+                int height = AlignToBCBlock((int)(((long)count + rowCapacity - 1) / rowCapacity));
+                return new ShPageLayout(maxDimension, height, pages);
+            }
 
             GaussianSplatImporter.TextureLayout layout = GaussianSplatImporter.ChoosePotTextureLayout(count);
             // The general layout chooser uses float division, which can round down for large counts.
