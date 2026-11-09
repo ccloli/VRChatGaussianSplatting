@@ -3202,9 +3202,15 @@ namespace GaussianSplatting.Editor.Importers
                 entry.shBand = (SHBand)EditorGUILayout.EnumPopup(GSEditorText.T("Max SH Band", "最大 SH バンド", "最大 SH 阶数"), entry.shBand);
                 if (entry.importAsLOD)
                 {
-                    entry.lodExtendedSHImport = EditorGUILayout.Toggle("Extended LOD SH Limit (Experimental)", entry.lodExtendedSHImport);
+                    entry.lodExtendedSHImport = EditorGUILayout.Toggle(GSEditorText.T(
+                        "Extended LOD SH Limit (Experimental)",
+                        "LOD の SH インポート上限を拡張 (実験的)",
+                        "扩展 LOD SH 导入上限（实验性）"), entry.lodExtendedSHImport);
                     if (entry.lodExtendedSHImport)
-                        EditorGUILayout.HelpBox("Raises the per-object SH import limit from 134,217,728 to 268,435,456 texels. Import may need substantially more memory and time; retaining more SH also increases baked texture size and runtime GPU memory. Scene-wide fused SH has a separate limit.", MessageType.Warning);
+                        EditorGUILayout.HelpBox(GSEditorText.T(
+                            "Raises the per-object SH import limit from 134,217,728 to 268,435,456 texels. Import may need substantially more memory and time; retaining more SH also increases baked texture size and runtime GPU memory. Scene-wide fused SH has a separate limit.",
+                            "オブジェクトごとの SH インポート上限を 134,217,728 から 268,435,456 テクセルに引き上げます。インポートに必要なメモリと時間が大幅に増える可能性があります。SH を多く保持すると、ベイク済みテクスチャのサイズと実行時の GPU メモリ使用量も増えます。シーン全体の統合 SH には別の上限があります。",
+                            "将单个对象的 SH 导入上限从 134,217,728 提高到 268,435,456 个纹素。导入可能需要显著更多的内存和时间；保留更多 SH 数据也会增加烘焙纹理大小和运行时显存占用。场景融合 SH 有单独的上限。"), MessageType.Warning);
                 }
                 EditorGUILayout.HelpBox(GSEditorText.T(
                     "Imports higher-order SH coefficient textures only up to the selected max band and sets the imported material to that band. If the selected band has no non-zero coefficients in the file, the importer falls back to the highest lower non-zero band.",
@@ -3212,8 +3218,8 @@ namespace GaussianSplatting.Editor.Importers
                 DrawSHLimitWarnings(entry);
                 entry.shCompression = (GaussianSplatImporter.SHCompression)EditorGUILayout.IntPopup(GSEditorText.C("SH Compression", "SH 圧縮", "SH 压缩"), (int)entry.shCompression, ShFormatLabels, ShFormatValues);
                 EditorGUILayout.HelpBox(GSEditorText.T(
-                    "SH texture format: RGBA32 = 32bpp, RGB565 = 16bpp, BC7 = 8bpp, BC1 = 4bpp. RGB565 and BC compression are lossy. LOD scene fusion uses BC7 regardless of this setting. (LOD only: the import steps down to the highest band that fits its SH cap, and the scene's fused SH must fit one texture; objects past that fall back to DC.)",
-                    "SH テクスチャ形式: RGBA32 = 32bpp、RGB565 = 16bpp、BC7 = 8bpp、BC1 = 4bpp。RGB565 と BC 圧縮は不可逆です。LOD のシーン統合では、この設定にかかわらず BC7 を使用します。(LOD のみ: インポートは SH 上限に収まる最大バンドまで自動的に下げられ、さらにシーン全体の統合 SH は 1 テクスチャに収まる必要があります。超過するオブジェクトは DC にフォールバックします。)", "SH 纹理格式：RGBA32 = 32bpp、RGB565 = 16bpp、BC7 = 8bpp、BC1 = 4bpp。RGB565 和 BC 压缩均为有损压缩。LOD 场景融合始终使用 BC7。（仅 LOD：导入时会降低至符合 SH 上限的最高阶数。场景融合有单独的 SH 上限；启用分页融合 SH 可提高上限，超出上限的对象将回退到 DC。）"), MessageType.Info);
+                    "SH texture format: RGBA32 = 32bpp, RGB565 = 16bpp, BC7 = 8bpp, BC1 = 4bpp. RGB565 and BC compression are lossy. LOD scene fusion uses BC7 regardless of this setting. (LOD only: the import steps down to the highest band that fits its SH cap. Scene fusion has a separate SH limit; enabling Paged Fused SH increases it, and objects exceeding the limit fall back to DC.)",
+                    "SH テクスチャ形式: RGBA32 = 32bpp、RGB565 = 16bpp、BC7 = 8bpp、BC1 = 4bpp。RGB565 と BC 圧縮は不可逆です。LOD のシーン統合では、この設定にかかわらず BC7 を使用します。(LOD のみ: インポートは SH 上限に収まる最大バンドまで自動的に下げられます。シーン統合の SH には別の上限があり、ページ分割 SH を有効にすると上限を増やせます。超過するオブジェクトは DC にフォールバックします。)", "SH 纹理格式：RGBA32 = 32bpp、RGB565 = 16bpp、BC7 = 8bpp、BC1 = 4bpp。RGB565 和 BC 压缩均为有损压缩。LOD 场景融合始终使用 BC7。（仅 LOD：导入时会降低至符合 SH 上限的最高阶数。场景融合有单独的 SH 上限；启用分页融合 SH 可提高上限，超出上限的对象将回退到 DC。）"), MessageType.Info);
             }
             else
             {
