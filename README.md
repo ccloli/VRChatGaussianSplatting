@@ -61,6 +61,7 @@ Gaussian splatting for VRChat worlds: runtime camera-sorted rendering through Ud
 - **Transform / cleanup**: `Crop To Bounds` (preview box handle), `Horizon Alignment` / `Wall Alignment` (pick points in the preview), `Normalize Size` (scale the floater-robust extent to a target size).
 
 **Combined (LOD) mode:**
+- `Extended LOD SH Limit (Experimental)` — opt in to raising the per-object SH import limit from 134,217,728 to 268,435,456 texels. Larger imports can need substantially more memory and time, and retaining more SH increases texture size and runtime GPU memory; scene-wide fused SH has a separate limit.
 - `Chunk Size` — combined-render chunk size.
 - `LOD Resampling Rate` / `LOD Reused Splats` — tune the LOD pyramid's stored-splat count.
 - Scene-wide SH is fused using high-quality BC7 regardless of the import compression setting. This reduces view-dependent color errors at the cost of longer fusion. Reimport existing LOD splats to apply the higher-precision SH import.

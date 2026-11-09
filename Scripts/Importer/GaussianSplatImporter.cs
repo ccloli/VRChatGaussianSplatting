@@ -103,6 +103,7 @@ namespace GaussianSplatting
             public bool lodComputeSplats;
             public int lodResamplePercent;
             public int lodReusePercent;
+            public bool lodExtendedSHImport;   // opt in to the larger per-object SH import budget
             public bool normalizeSize;        // scale splats so the floater-robust extent matches normalizeTargetSize
             public float normalizeTargetSize; // target extent (world units) when normalizeSize is on; <=0 -> 1.0
             public SHCompression shCompression; // final SH texture format
@@ -457,17 +458,28 @@ namespace GaussianSplatting
             return SHBand.SH0;
         }
 
-        // Cap on what the LOD importer will bake as SH: stored splats x coefficients, i.e. two 8K SH textures.
-        // Past it the SH textures need many GB and the per-cluster averaging is prohibitively slow, so the import
-        // steps down a band. Shared with the wizard so its pre-import estimate uses the same threshold.
+        // Cap on LOD import SH: stored splats x coefficients. The larger budget is opt-in because intermediate
+        // arrays, LOD clustering, and compression can consume substantial memory and take much longer to import.
         public const long MaxLODImportSHTexels = 2L * 8192 * 8192;
+        public const long ExtendedLODImportSHTexels = 4L * 8192 * 8192;
+
+        public static long GetLODImportSHTexelLimit(bool extended)
+        {
+            return extended ? ExtendedLODImportSHTexels : MaxLODImportSHTexels;
+        }
 
         // Highest band that both the source carries and the SH texel cap allows at storedSplatCount. Steps down a
         // whole band at a time: a partial band would store coefficients the shader's band setting never reads.
         public static SHBand ResolveLODImportSHBand(int availableCoeffCount, int storedSplatCount)
         {
+            return ResolveLODImportSHBand(availableCoeffCount, storedSplatCount, false);
+        }
+
+        public static SHBand ResolveLODImportSHBand(int availableCoeffCount, int storedSplatCount, bool extended)
+        {
             SHBand band = SHBandForCoeffCount(availableCoeffCount);
-            while (band > SHBand.SH0 && (long)storedSplatCount * SHCoeffCountForBand(band) > MaxLODImportSHTexels)
+            long shTexelLimit = GetLODImportSHTexelLimit(extended);
+            while (band > SHBand.SH0 && (long)storedSplatCount * SHCoeffCountForBand(band) > shTexelLimit)
             {
                 band--;
             }
@@ -1551,6 +1563,7 @@ namespace GaussianSplatting.Editor.Importers
             public bool lodComputeSplats = true;
             public int lodResamplePercent = DefaultLODResamplePercent;
             public int lodReusePercent = DefaultLODReusePercent;
+            public bool lodExtendedSHImport;
             public bool normalizeSize;
             public float normalizeTargetSize = 1.0f;
             public GaussianSplatImporter.SHCompression shCompression = DefaultSHCompression;
@@ -1930,6 +1943,7 @@ namespace GaussianSplatting.Editor.Importers
                 lodComputeSplats = o.lodComputeSplats,
                 lodResamplePercent = o.lodResamplePercent,
                 lodReusePercent = o.lodReusePercent,
+                lodExtendedSHImport = o.lodExtendedSHImport,
                 normalizeSize = o.normalizeSize,
                 normalizeTargetSize = o.normalizeTargetSize,
                 shCompression = o.shCompression,
@@ -2659,7 +2673,8 @@ namespace GaussianSplatting.Editor.Importers
             }
 
             int storedCount = EstimateStoredLodSplatCount(estimatedSourceCount, entry.lodChunkSize, entry.lodComputeSplats, entry.lodResamplePercent, entry.lodReusePercent);
-            SHBand cappedBand = GaussianSplatImporter.ResolveLODImportSHBand(effectiveCoeffCount, storedCount);
+            long shTexelLimit = GaussianSplatImporter.GetLODImportSHTexelLimit(entry.lodExtendedSHImport);
+            SHBand cappedBand = GaussianSplatImporter.ResolveLODImportSHBand(effectiveCoeffCount, storedCount, entry.lodExtendedSHImport);
             int cappedCoeffCount = GaussianSplatImporter.SHCoeffCountForBand(cappedBand);
             if (cappedCoeffCount >= effectiveCoeffCount)
             {
@@ -2686,9 +2701,9 @@ namespace GaussianSplatting.Editor.Importers
                 ? $" 预计输入为 {estimatedSourceCount:N0} 个 Splat；存储数量已考虑 LOD 重采样和复用。"
                 : string.Empty;
             EditorGUILayout.HelpBox(GSEditorText.T(
-                $"{GaussianSplatImporter.SHBandForCoeffCount(effectiveCoeffCount)} needs {storedCount:N0} stored splats x {effectiveCoeffCount} coefficients = {shTexels:N0} SH texels, over the import cap of {GaussianSplatImporter.MaxLODImportSHTexels:N0}. {outcomeEn}{lodNoteEn}",
-                $"{GaussianSplatImporter.SHBandForCoeffCount(effectiveCoeffCount)} は 保存 {storedCount:N0} splat x 係数 {effectiveCoeffCount} = SH テクセル {shTexels:N0} を要し、インポート上限 {GaussianSplatImporter.MaxLODImportSHTexels:N0} を超えます。{outcomeJa}{lodNoteJa}",
-                $"按预计存储的 {storedCount:N0} 个 Splat 计算，{GaussianSplatImporter.SHBandForCoeffCount(effectiveCoeffCount)} 需要 {storedCount:N0} × {effectiveCoeffCount} = {shTexels:N0} 个 SH 纹素，超过导入上限 {GaussianSplatImporter.MaxLODImportSHTexels:N0}。{outcomeZh}{lodNoteZh}"), MessageType.Warning);
+                $"{GaussianSplatImporter.SHBandForCoeffCount(effectiveCoeffCount)} needs {storedCount:N0} stored splats x {effectiveCoeffCount} coefficients = {shTexels:N0} SH texels, over the import cap of {shTexelLimit:N0}. {outcomeEn}{lodNoteEn}",
+                $"{GaussianSplatImporter.SHBandForCoeffCount(effectiveCoeffCount)} は 保存 {storedCount:N0} splat x 係数 {effectiveCoeffCount} = SH テクセル {shTexels:N0} を要し、インポート上限 {shTexelLimit:N0} を超えます。{outcomeJa}{lodNoteJa}",
+                $"按预计存储的 {storedCount:N0} 个 Splat 计算，{GaussianSplatImporter.SHBandForCoeffCount(effectiveCoeffCount)} 需要 {storedCount:N0} × {effectiveCoeffCount} = {shTexels:N0} 个 SH 纹素，超过导入上限 {shTexelLimit:N0}。{outcomeZh}{lodNoteZh}"), MessageType.Warning);
         }
 
         string GetComputedLodSplatEstimateLabel(ImportEntry entry)
@@ -2980,6 +2995,7 @@ namespace GaussianSplatting.Editor.Importers
             options.lodComputeSplats = entry.importAsLOD && entry.lodComputeSplats;
             options.lodResamplePercent = options.lodComputeSplats ? NormalizeLODResamplePercent(entry.lodResamplePercent) : DefaultLODResamplePercent;
             options.lodReusePercent = options.lodComputeSplats ? NormalizeLODReusePercent(entry.lodReusePercent) : DefaultLODReusePercent;
+            options.lodExtendedSHImport = entry.importAsLOD && entry.lodExtendedSHImport;
             options.normalizeSize = entry.normalizeSize;
             options.normalizeTargetSize = entry.normalizeTargetSize;
             options.shCompression = entry.shCompression;
@@ -3184,6 +3200,12 @@ namespace GaussianSplatting.Editor.Importers
             if (entry.importSphericalHarmonics)
             {
                 entry.shBand = (SHBand)EditorGUILayout.EnumPopup(GSEditorText.T("Max SH Band", "最大 SH バンド", "最大 SH 阶数"), entry.shBand);
+                if (entry.importAsLOD)
+                {
+                    entry.lodExtendedSHImport = EditorGUILayout.Toggle("Extended LOD SH Limit (Experimental)", entry.lodExtendedSHImport);
+                    if (entry.lodExtendedSHImport)
+                        EditorGUILayout.HelpBox("Raises the per-object SH import limit from 134,217,728 to 268,435,456 texels. Import may need substantially more memory and time; retaining more SH also increases baked texture size and runtime GPU memory. Scene-wide fused SH has a separate limit.", MessageType.Warning);
+                }
                 EditorGUILayout.HelpBox(GSEditorText.T(
                     "Imports higher-order SH coefficient textures only up to the selected max band and sets the imported material to that band. If the selected band has no non-zero coefficients in the file, the importer falls back to the highest lower non-zero band.",
                     "選択した最大バンドまでの高次 SH 係数テクスチャだけをインポートし、インポートされたマテリアルをそのバンドに設定します。選択したバンドに非ゼロ係数がない場合は、より低い非ゼロの最大バンドにフォールバックします。", "仅导入所选最大阶数以内的高阶 SH 系数纹理，并将导入材质设为该阶数。如果文件中所选阶数没有非零系数，导入器将回退到较低的最高非零阶数。"), MessageType.Info);
@@ -3261,6 +3283,7 @@ namespace GaussianSplatting.Editor.Importers
                 e.lodComputeSplats = source.lodComputeSplats;
                 e.lodResamplePercent = source.lodResamplePercent;
                 e.lodReusePercent = source.lodReusePercent;
+                e.lodExtendedSHImport = source.lodExtendedSHImport;
                 e.normalizeSize = source.normalizeSize;
                 e.normalizeTargetSize = source.normalizeTargetSize;
                 e.shCompression = source.shCompression;

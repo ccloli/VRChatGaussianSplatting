@@ -1,6 +1,10 @@
 using System.Collections.Generic;
+using System.Collections;
+using System.Reflection;
 using NUnit.Framework;
 using GaussianSplatting;
+using GaussianSplatting.Editor.Importers;
+using UnityEngine;
 
 namespace GaussianSplatting.Tests
 {
@@ -73,6 +77,73 @@ namespace GaussianSplatting.Tests
             offsets.Remove("f_rest_44");
             Assert.AreEqual(8, StreamedSplatReader.DetectSHCoeffCount(offsets, out int stride));
             Assert.AreEqual(15, stride);
+        }
+
+        [TestCase(15, 8_947_848, false, SHBand.SH3)]
+        [TestCase(15, 8_947_849, false, SHBand.SH2)]
+        [TestCase(15, 15_000_000, false, SHBand.SH2)]
+        [TestCase(15, 15_000_000, true, SHBand.SH3)]
+        [TestCase(15, 17_895_697, true, SHBand.SH3)]
+        [TestCase(15, 17_895_698, true, SHBand.SH2)]
+        [TestCase(15, 33_554_432, true, SHBand.SH2)]
+        [TestCase(15, 33_554_433, true, SHBand.SH1)]
+        [TestCase(8, 10_000_000, true, SHBand.SH2)]
+        [TestCase(15, int.MaxValue, true, SHBand.SH0)]
+        public void ImportBudget_SelectsOnlyAvailableWholeBands(int sourceCoefficients, int storedSplats, bool extended, SHBand expected)
+        {
+            Assert.AreEqual(expected, GaussianSplatImporter.ResolveLODImportSHBand(sourceCoefficients, storedSplats, extended));
+        }
+
+        [Test]
+        public void LegacyImportBudgetApiKeepsOriginalLimit()
+        {
+            Assert.AreEqual(SHBand.SH2, GaussianSplatImporter.ResolveLODImportSHBand(15, 15_000_000));
+        }
+
+        [Test]
+        public void ImportMetadata_DefaultsToOriginalLimitAndPreservesOptIn()
+        {
+            var legacy = GaussianSplatImporter.ImportMetadata.FromJson("{\"options\":{\"lodReusePercent\":50}}");
+            Assert.IsFalse(legacy.options.lodExtendedSHImport);
+            var metadata = new GaussianSplatImporter.ImportMetadata
+            {
+                options = new GaussianSplatImporter.ImportOptions { lodReusePercent = 50, lodExtendedSHImport = true }
+            };
+            var restored = GaussianSplatImporter.ImportMetadata.FromJson(GaussianSplatImporter.ImportMetadata.ToJson(metadata));
+            Assert.IsTrue(restored.options.lodExtendedSHImport);
+            Assert.AreEqual(50, restored.options.lodReusePercent);
+        }
+
+        [Test]
+        public void ImportWizard_PropagatesOptInAndCopiesItToOtherEntries()
+        {
+            var wizard = ScriptableObject.CreateInstance<GaussianSplatImportWizard>();
+            try
+            {
+                var wizardType = typeof(GaussianSplatImportWizard);
+                var entryType = wizardType.GetNestedType("ImportEntry", BindingFlags.NonPublic);
+                var source = System.Activator.CreateInstance(entryType, true);
+                var target = System.Activator.CreateInstance(entryType, true);
+                entryType.GetField("lodExtendedSHImport").SetValue(source, true);
+
+                var optionsMethod = wizardType.GetMethod("GetEntryOptions", BindingFlags.Instance | BindingFlags.NonPublic);
+                var options = (GaussianSplatImporter.ImportOptions)optionsMethod.Invoke(wizard, new[] { source });
+                Assert.IsTrue(options.lodExtendedSHImport);
+
+                var entries = (IList)wizardType.GetField("_entries", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(wizard);
+                entries.Add(source);
+                entries.Add(target);
+                wizardType.GetMethod("CopyEntrySettingsToAll", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(wizard, new[] { source });
+                Assert.IsTrue((bool)entryType.GetField("lodExtendedSHImport").GetValue(target));
+
+                entryType.GetField("importMode").SetValue(source, GaussianSplatImportWizard.ImportMode.Standalone);
+                options = (GaussianSplatImporter.ImportOptions)optionsMethod.Invoke(wizard, new[] { source });
+                Assert.IsFalse(options.lodExtendedSHImport);
+            }
+            finally
+            {
+                Object.DestroyImmediate(wizard);
+            }
         }
     }
 }

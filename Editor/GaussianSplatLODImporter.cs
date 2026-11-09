@@ -459,10 +459,8 @@ namespace GaussianSplatting
                 chunkSize = ResolveChunkSize(chunkSize, splatCount);
                 int lodResamplePercent = options.lodComputeSplats ? NormalizeLodResamplePercent(options.lodResamplePercent) : DefaultLodResamplePercent;
                 int lodReusePercent = options.lodComputeSplats ? NormalizeLodReusePercent(options.lodReusePercent) : DefaultLodReusePercent;
-                // SH is capped to the requested Max SH Band (shared with the non-LOD path), then stepped down to the
-                // highest band whose stored SH fits within ~2 8K textures (storedSplats*coeffCount <= 2*8192^2).
-                // Beyond that the SH textures need many GB and the per-cluster averaging is prohibitively slow, so
-                // huge splats (e.g. 12M+ at SH3) import at a lower band, or DC-only when not even SH1 fits.
+                // SH is capped to the requested Max SH Band, then stepped down to the highest whole band that fits
+                // the selected per-object import budget. The extended budget is an explicit opt-in.
                 int requestedShCoeffCount = options.importSphericalHarmonics ? GaussianSplatImporter.SHCoeffCountForBand(options.defaultSHBand) : 0;
                 int availableShCoeffCount = Mathf.Min(layout.shCoeffCount, requestedShCoeffCount);
                 if (options.importSphericalHarmonics)
@@ -470,7 +468,8 @@ namespace GaussianSplatting
                     GaussianSplatImporter.WarnSHBandLimitedBySource(Path.GetFileName(sourcePath), options.defaultSHBand, layout.shCoeffCount);
                 }
                 int shStoredEstimate = EstimateStoredSplatCount(splatCount, chunkSize, options.lodComputeSplats, lodResamplePercent, lodReusePercent);
-                SHBand cappedShBand = GaussianSplatImporter.ResolveLODImportSHBand(availableShCoeffCount, shStoredEstimate);
+                long shTexelLimit = GaussianSplatImporter.GetLODImportSHTexelLimit(options.lodExtendedSHImport);
+                SHBand cappedShBand = GaussianSplatImporter.ResolveLODImportSHBand(availableShCoeffCount, shStoredEstimate, options.lodExtendedSHImport);
                 int shCoeffCount = GaussianSplatImporter.SHCoeffCountForBand(cappedShBand);
                 if (availableShCoeffCount > shCoeffCount)
                 {
@@ -481,7 +480,7 @@ namespace GaussianSplatting
                     string lodNote = options.lodComputeSplats
                         ? $" Computed LOD raises the stored count above the {splatCount:N0} source splats; without it the import stores {splatCount:N0}."
                         : string.Empty;
-                    Debug.LogWarning($"[GaussianSplatLOD] '{Path.GetFileName(sourcePath)}': {availableBand} needs {shStoredEstimate:N0} stored splats x {availableShCoeffCount} coefficients = {(long)shStoredEstimate * availableShCoeffCount:N0} SH texels, over the import cap of {GaussianSplatImporter.MaxLODImportSHTexels:N0}. {outcome}{lodNote}");
+                    Debug.LogWarning($"[GaussianSplatLOD] '{Path.GetFileName(sourcePath)}': {availableBand} needs {shStoredEstimate:N0} stored splats x {availableShCoeffCount} coefficients = {(long)shStoredEstimate * availableShCoeffCount:N0} SH texels, over the import cap of {shTexelLimit:N0}. {outcome}{lodNote}");
                 }
                 BigFloatBuffer shStore = shCoeffCount > 0 ? new BigFloatBuffer((long)splatCount * shCoeffCount * 3) : null;
                 int bucketBits = ResolveStreamedBucketBits(splatCount);
